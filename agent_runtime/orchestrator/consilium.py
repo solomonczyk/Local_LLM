@@ -334,15 +334,20 @@ class Consilium:
         
         return result_content, stats
     
-    def consult(self, task: str) -> Dict[str, Any]:
+    def consult(self, task: str, use_smart_routing: bool = True) -> Dict[str, Any]:
         """
         Получить мнения агентов по задаче (параллельно)
-        Количество агентов зависит от CONSILIUM_MODE
+        
+        Параметры:
+        - task: задача для анализа
+        - use_smart_routing: использовать ли умный роутинг (по умолчанию True)
+          Если False, используется статичный список из CONSILIUM_MODE
         
         Возвращает:
         - opinions: мнения каждого агента
         - director_decision: решение директора (только в CRITICAL)
         - recommendation: финальная рекомендация
+        - routing: информация о роутинге (если use_smart_routing=True)
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
         import time
@@ -350,9 +355,28 @@ class Consilium:
         start_time = time.time()
         opinions = {}
         kb_stats_all = {}
+        routing_info = None
         
-        # Используем только активных агентов (без director, он отдельно)
-        agent_names = [name for name in self.active_agents if name != "director" and name in self.agents]
+        # Smart routing: выбираем агентов по содержимому задачи
+        if use_smart_routing:
+            routing_info = route_agents(task)
+            agent_names = [name for name in routing_info["agents"] 
+                         if name != "director" and name in self.agents]
+            effective_mode = routing_info["mode"]
+            include_director = "director" in routing_info["agents"]
+            
+            print(f"[ROUTING] Smart routing: {routing_info['mode']}")
+            print(f"[ROUTING] Confidence: {routing_info['confidence']}, Domains: {routing_info['domains_matched']}")
+            if routing_info.get("downgraded"):
+                print(f"[ROUTING] DOWNGRADED from CRITICAL to STANDARD (low confidence)")
+            print(f"[ROUTING] Selected agents: {routing_info['agents']}")
+        else:
+            # Fallback на статичный список из конфига
+            agent_names = [name for name in self.active_agents 
+                         if name != "director" and name in self.agents]
+            effective_mode = self.mode
+            include_director = "director" in self.active_agents
+            print(f"[*] Static routing: {self.mode}")
         
         print(f"[*] Consulting {len(agent_names)} agents: {agent_names}")
         print(f"[*] KB retrieval: top_k={self.kb_top_k}, max_chars={self.kb_max_chars}")
@@ -392,11 +416,11 @@ class Consilium:
         
         agents_time = time.time() - start_time
         
-        # Director принимает решение только в CRITICAL режиме
+        # Director принимает решение только если включён (smart routing или CRITICAL mode)
         director_decision = None
         director_time = 0
         
-        if "director" in self.active_agents:
+        if include_director:
             director_start = time.time()
             director_prompt = self._build_director_prompt(task, opinions)
             director_decision = self.agents["director"].think(director_prompt)
@@ -404,9 +428,9 @@ class Consilium:
         
         total_time = time.time() - start_time
         
-        return {
+        result = {
             "task": task,
-            "mode": self.mode,
+            "mode": effective_mode,
             "opinions": opinions,
             "director_decision": director_decision,
             "recommendation": self._build_recommendation(opinions, director_decision),
@@ -424,6 +448,24 @@ class Consilium:
                 "total": round(total_time, 2)
             }
         }
+        
+        # Добавляем routing info если использовался smart routing
+        if routing_info:
+            result["routing"] = {
+                "smart_routing": True,
+                "confidence": routing_info["confidence"],
+                "domains_matched": routing_info["domains_matched"],
+                "triggers_matched": routing_info["triggers_matched"],
+                "downgraded": routing_info.get("downgraded", False),
+                "reason": routing_info["reason"]
+            }
+        else:
+            result["routing"] = {
+                "smart_routing": False,
+                "static_mode": self.mode
+            }
+        
+        return result
     
     def _specialize_task(self, task: str, agent_name: str) -> str:
         """Адаптировать задачу для конкретного агента с KB (с лимитами)"""
