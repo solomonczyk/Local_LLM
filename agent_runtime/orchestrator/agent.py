@@ -7,6 +7,154 @@ from typing import Dict, Any, List, Optional
 from collections import deque
 
 
+class CircuitBreakerError(Exception):
+    """Исключение когда Circuit Breaker открыт"""
+    pass
+
+
+class CircuitBreaker:
+    """
+    Circuit Breaker pattern для защиты от cascade failures.
+    
+    Состояния:
+    - CLOSED: нормальная работа, запросы проходят
+    - OPEN: сервис недоступен, запросы блокируются
+    - HALF_OPEN: пробный режим, один запрос для проверки
+    
+    Параметры:
+    - failure_threshold: количество ошибок для перехода в OPEN
+    - recovery_timeout: время в секундах до перехода в HALF_OPEN
+    - success_threshold: количество успехов в HALF_OPEN для перехода в CLOSED
+    """
+    
+    def __init__(
+        self,
+        failure_threshold: int = 3,
+        recovery_timeout: int = 60,
+        success_threshold: int = 1
+    ):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.success_threshold = success_threshold
+        
+        self.state = "CLOSED"
+        self.failure_count = 0
+        self.success_count = 0
+        self.last_failure_time: Optional[float] = None
+        
+        # Метрики
+        self.total_calls = 0
+        self.total_failures = 0
+        self.total_blocked = 0
+        self.state_changes: List[Dict[str, Any]] = []
+    
+    def _record_state_change(self, old_state: str, new_state: str, reason: str):
+        """Записать изменение состояния"""
+        self.state_changes.append({
+            "timestamp": time.time(),
+            "from": old_state,
+            "to": new_state,
+            "reason": reason
+        })
+        # Храним только последние 10 изменений
+        if len(self.state_changes) > 10:
+            self.state_changes.pop(0)
+    
+    def can_execute(self) -> bool:
+        """Проверить можно ли выполнить запрос"""
+        if self.state == "CLOSED":
+            return True
+        
+        if self.state == "OPEN":
+            # Проверяем прошло ли время recovery
+            if self.last_failure_time and \
+               time.time() - self.last_failure_time >= self.recovery_timeout:
+                old_state = self.state
+                self.state = "HALF_OPEN"
+                self.success_count = 0
+                self._record_state_change(old_state, "HALF_OPEN", "Recovery timeout elapsed")
+                return True
+            return False
+        
+        if self.state == "HALF_OPEN":
+            return True
+        
+        return False
+    
+    def record_success(self):
+        """Записать успешный вызов"""
+        self.total_calls += 1
+        
+        if self.state == "HALF_OPEN":
+            self.success_count += 1
+            if self.success_count >= self.success_threshold:
+                old_state = self.state
+                self.state = "CLOSED"
+                self.failure_count = 0
+                self._record_state_change(old_state, "CLOSED", f"{self.success_count} successful calls")
+        elif self.state == "CLOSED":
+            # Сбрасываем счётчик ошибок при успехе
+            self.failure_count = 0
+    
+    def record_failure(self, error: Exception = None):
+        """Записать неудачный вызов"""
+        self.total_calls += 1
+        self.total_failures += 1
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.state == "HALF_OPEN":
+            # Одна ошибка в HALF_OPEN → сразу OPEN
+            old_state = self.state
+            self.state = "OPEN"
+            self._record_state_change(old_state, "OPEN", f"Failure in HALF_OPEN: {error}")
+        elif self.state == "CLOSED":
+            if self.failure_count >= self.failure_threshold:
+                old_state = self.state
+                self.state = "OPEN"
+                self._record_state_change(old_state, "OPEN", 
+                    f"Failure threshold reached ({self.failure_count}/{self.failure_threshold})")
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Получить статус Circuit Breaker"""
+        time_until_retry = None
+        if self.state == "OPEN" and self.last_failure_time:
+            elapsed = time.time() - self.last_failure_time
+            time_until_retry = max(0, self.recovery_timeout - elapsed)
+        
+        return {
+            "state": self.state,
+            "failure_count": self.failure_count,
+            "success_count": self.success_count,
+            "total_calls": self.total_calls,
+            "total_failures": self.total_failures,
+            "total_blocked": self.total_blocked,
+            "time_until_retry": round(time_until_retry, 1) if time_until_retry else None,
+            "config": {
+                "failure_threshold": self.failure_threshold,
+                "recovery_timeout": self.recovery_timeout,
+                "success_threshold": self.success_threshold
+            },
+            "recent_state_changes": self.state_changes[-3:]  # последние 3
+        }
+
+
+# Глобальный Circuit Breaker для LLM (shared между всеми агентами)
+_llm_circuit_breaker: Optional[CircuitBreaker] = None
+
+
+def get_llm_circuit_breaker() -> CircuitBreaker:
+    """Получить singleton Circuit Breaker для LLM"""
+    global _llm_circuit_breaker
+    if _llm_circuit_breaker is None:
+        _llm_circuit_breaker = CircuitBreaker(
+            failure_threshold=3,
+            recovery_timeout=60,
+            success_threshold=1
+        )
+    return _llm_circuit_breaker
+
+
 class Agent:
     """Базовый агент для работы с LLM и tools"""
     
@@ -34,7 +182,15 @@ class Agent:
         self._retrieval_call_count = 0
     
     def _call_llm(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
-        """Internal LLM call with timing"""
+        """Internal LLM call with timing and Circuit Breaker"""
+        circuit_breaker = get_llm_circuit_breaker()
+        
+        # Проверяем Circuit Breaker
+        if not circuit_breaker.can_execute():
+            circuit_breaker.total_blocked += 1
+            status = circuit_breaker.get_status()
+            return f"[CIRCUIT_BREAKER_OPEN] LLM service unavailable. State: {status['state']}, retry in {status['time_until_retry']}s"
+        
         start = time.perf_counter()
         try:
             response = requests.post(
@@ -55,9 +211,22 @@ class Agent:
             self._llm_times.append(elapsed_ms)
             self._llm_call_count += 1
             
+            # Успех - записываем в Circuit Breaker
+            circuit_breaker.record_success()
+            
             return result
+        except requests.exceptions.ConnectionError as e:
+            # Connection error - записываем failure
+            circuit_breaker.record_failure(e)
+            return f"[LLM_CONNECTION_ERROR] {e}"
+        except requests.exceptions.Timeout as e:
+            # Timeout - записываем failure
+            circuit_breaker.record_failure(e)
+            return f"[LLM_TIMEOUT] {e}"
         except Exception as e:
-            return f"Error calling LLM: {e}"
+            # Другие ошибки - записываем failure
+            circuit_breaker.record_failure(e)
+            return f"[LLM_ERROR] {e}"
     
     def call_llm(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
         """Вызов LLM (публичный метод для обратной совместимости)"""
@@ -318,6 +487,9 @@ Provide a clear, concise answer."""
         avg_llm_ms = round(sum(self._llm_times) / len(self._llm_times), 1) if self._llm_times else 0
         avg_retrieval_ms = round(sum(self._retrieval_times) / len(self._retrieval_times), 1) if self._retrieval_times else 0
         
+        # Добавляем статус Circuit Breaker
+        circuit_breaker = get_llm_circuit_breaker()
+        
         return {
             "avg_llm_ms": avg_llm_ms,
             "avg_retrieval_ms": avg_retrieval_ms,
@@ -325,5 +497,6 @@ Provide a clear, concise answer."""
             "retrieval_calls": self._retrieval_call_count,
             "window_size": self.TIMING_WINDOW,
             "llm_samples": len(self._llm_times),
-            "retrieval_samples": len(self._retrieval_times)
+            "retrieval_samples": len(self._retrieval_times),
+            "circuit_breaker": circuit_breaker.get_status()
         }
