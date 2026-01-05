@@ -180,9 +180,35 @@ class Agent:
         self._retrieval_times: deque = deque(maxlen=self.TIMING_WINDOW)
         self._llm_call_count = 0
         self._retrieval_call_count = 0
+        
+        # Retry configuration
+        self._max_retries = 3
+        self._retry_base_delay = 1.0  # секунды
+        self._retry_max_delay = 10.0  # максимальная задержка
+        self._retry_count = 0  # счётчик retry для метрик
+    
+    def _call_llm_once(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
+        """Один вызов LLM без retry (внутренний метод)"""
+        response = requests.post(
+            f"{self.llm_url}/chat/completions",
+            json={
+                "model": "qwen2.5-coder-lora",
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": 0.7
+            },
+            timeout=180
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
     
     def _call_llm(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
-        """Internal LLM call with timing and Circuit Breaker"""
+        """
+        Internal LLM call with:
+        - Circuit Breaker protection
+        - Exponential backoff retry for transient errors
+        - Timing metrics
+        """
         circuit_breaker = get_llm_circuit_breaker()
         
         # Проверяем Circuit Breaker
@@ -192,41 +218,83 @@ class Agent:
             return f"[CIRCUIT_BREAKER_OPEN] LLM service unavailable. State: {status['state']}, retry in {status['time_until_retry']}s"
         
         start = time.perf_counter()
-        try:
-            response = requests.post(
-                f"{self.llm_url}/chat/completions",
-                json={
-                    "model": "qwen2.5-coder-lora",
-                    "messages": messages,
-                    "max_tokens": max_tokens,
-                    "temperature": 0.7
-                },
-                timeout=180
-            )
-            response.raise_for_status()
-            result = response.json()["choices"][0]["message"]["content"]
-            
-            # Track timing
-            elapsed_ms = (time.perf_counter() - start) * 1000
-            self._llm_times.append(elapsed_ms)
-            self._llm_call_count += 1
-            
-            # Успех - записываем в Circuit Breaker
-            circuit_breaker.record_success()
-            
-            return result
-        except requests.exceptions.ConnectionError as e:
-            # Connection error - записываем failure
-            circuit_breaker.record_failure(e)
-            return f"[LLM_CONNECTION_ERROR] {e}"
-        except requests.exceptions.Timeout as e:
-            # Timeout - записываем failure
-            circuit_breaker.record_failure(e)
-            return f"[LLM_TIMEOUT] {e}"
-        except Exception as e:
-            # Другие ошибки - записываем failure
-            circuit_breaker.record_failure(e)
-            return f"[LLM_ERROR] {e}"
+        last_error = None
+        
+        for attempt in range(self._max_retries):
+            try:
+                result = self._call_llm_once(messages, max_tokens)
+                
+                # Track timing
+                elapsed_ms = (time.perf_counter() - start) * 1000
+                self._llm_times.append(elapsed_ms)
+                self._llm_call_count += 1
+                
+                # Успех - записываем в Circuit Breaker
+                circuit_breaker.record_success()
+                
+                # Логируем если был retry
+                if attempt > 0:
+                    print(f"[RETRY] LLM call succeeded after {attempt} retries")
+                
+                return result
+                
+            except requests.exceptions.Timeout as e:
+                # Timeout - можно retry
+                last_error = e
+                self._retry_count += 1
+                
+                if attempt < self._max_retries - 1:
+                    delay = min(
+                        self._retry_base_delay * (2 ** attempt),
+                        self._retry_max_delay
+                    )
+                    print(f"[RETRY] LLM timeout, attempt {attempt + 1}/{self._max_retries}, waiting {delay}s...")
+                    time.sleep(delay)
+                else:
+                    # Последняя попытка - записываем failure в CB
+                    circuit_breaker.record_failure(e)
+                    return f"[LLM_TIMEOUT] {e} (after {self._max_retries} attempts)"
+                    
+            except requests.exceptions.ConnectionError as e:
+                # Connection error - НЕ retry (сервер недоступен)
+                circuit_breaker.record_failure(e)
+                return f"[LLM_CONNECTION_ERROR] {e}"
+                
+            except requests.exceptions.HTTPError as e:
+                # HTTP error - retry только для 5xx
+                if hasattr(e, 'response') and e.response is not None:
+                    status_code = e.response.status_code
+                    if 500 <= status_code < 600:
+                        # Server error - можно retry
+                        last_error = e
+                        self._retry_count += 1
+                        
+                        if attempt < self._max_retries - 1:
+                            delay = min(
+                                self._retry_base_delay * (2 ** attempt),
+                                self._retry_max_delay
+                            )
+                            print(f"[RETRY] LLM HTTP {status_code}, attempt {attempt + 1}/{self._max_retries}, waiting {delay}s...")
+                            time.sleep(delay)
+                        else:
+                            circuit_breaker.record_failure(e)
+                            return f"[LLM_HTTP_ERROR] {e} (after {self._max_retries} attempts)"
+                    else:
+                        # Client error (4xx) - не retry
+                        circuit_breaker.record_failure(e)
+                        return f"[LLM_HTTP_ERROR] {e}"
+                else:
+                    circuit_breaker.record_failure(e)
+                    return f"[LLM_HTTP_ERROR] {e}"
+                    
+            except Exception as e:
+                # Другие ошибки - не retry
+                circuit_breaker.record_failure(e)
+                return f"[LLM_ERROR] {e}"
+        
+        # Не должны сюда попасть, но на всякий случай
+        circuit_breaker.record_failure(last_error)
+        return f"[LLM_ERROR] Max retries exceeded: {last_error}"
     
     def call_llm(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
         """Вызов LLM (публичный метод для обратной совместимости)"""
@@ -549,8 +617,14 @@ Provide a clear, concise answer."""
             "avg_retrieval_ms": avg_retrieval_ms,
             "llm_calls": self._llm_call_count,
             "retrieval_calls": self._retrieval_call_count,
+            "retry_count": self._retry_count,
             "window_size": self.TIMING_WINDOW,
             "llm_samples": len(self._llm_times),
             "retrieval_samples": len(self._retrieval_times),
+            "retry_config": {
+                "max_retries": self._max_retries,
+                "base_delay": self._retry_base_delay,
+                "max_delay": self._retry_max_delay
+            },
             "circuit_breaker": circuit_breaker.get_status()
         }
