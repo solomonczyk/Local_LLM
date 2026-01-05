@@ -10,6 +10,12 @@ import uvicorn
 from .tools import ToolExecutor
 from .config import AgentConfig, SecurityConfig
 from .audit import audit_logger
+from .database_tools import db_manager
+try:
+    from .memory_postgres import postgres_memory
+    MEMORY_POSTGRES_AVAILABLE = True
+except ImportError:
+    MEMORY_POSTGRES_AVAILABLE = False
 
 app = FastAPI(title="Agent Tool Server", version="1.0.0")
 
@@ -45,6 +51,64 @@ class ShellRequest(BaseModel):
     command: str
 
 
+class SystemInfoRequest(BaseModel):
+    info_type: str = "disks"
+
+
+class NetworkInfoRequest(BaseModel):
+    pass
+
+
+class DeleteFileRequest(BaseModel):
+    path: str
+
+
+class EditFileRequest(BaseModel):
+    path: str
+    old_text: str
+    new_text: str
+
+
+class CopyFileRequest(BaseModel):
+    source_path: str
+    dest_path: str
+
+
+class MoveFileRequest(BaseModel):
+    source_path: str
+    dest_path: str
+
+
+class DatabaseConnectionRequest(BaseModel):
+    name: str
+    host: str
+    database: str
+    user: str
+    password: str
+    port: int = 5432
+
+
+class DatabaseQueryRequest(BaseModel):
+    connection_name: str
+    query: str
+    params: Optional[List] = None
+
+
+class DatabaseSchemaRequest(BaseModel):
+    connection_name: str
+    table_name: Optional[str] = None
+
+
+class MemoryInitRequest(BaseModel):
+    connection_name: str = "agent_memory"
+
+
+class MemorySearchRequest(BaseModel):
+    session_id: str
+    query: str
+    limit: int = 20
+
+
 @app.get("/")
 async def root():
     return {
@@ -52,6 +116,19 @@ async def root():
         "version": "1.0.0",
         "workspace": str(SecurityConfig.WORKSPACE_ROOT),
         "access_level": AgentConfig.CURRENT_ACCESS_LEVEL
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "Agent Tool Server",
+        "version": "1.0.0",
+        "workspace": str(SecurityConfig.WORKSPACE_ROOT),
+        "access_level": AgentConfig.CURRENT_ACCESS_LEVEL,
+        "postgres_memory": MEMORY_POSTGRES_AVAILABLE
     }
 
 
@@ -109,6 +186,136 @@ async def shell(request: ShellRequest):
     return result
 
 
+@app.post("/tools/system_info")
+async def system_info(request: SystemInfoRequest):
+    """Системная информация"""
+    result = tool_executor.system_info(request.info_type)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/network_info")
+async def network_info(request: NetworkInfoRequest):
+    """Сетевая информация"""
+    result = tool_executor.network_info()
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/delete_file")
+async def delete_file(request: DeleteFileRequest):
+    """Удаление файла"""
+    result = tool_executor.delete_file(request.path)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/edit_file")
+async def edit_file(request: EditFileRequest):
+    """Редактирование файла"""
+    result = tool_executor.edit_file(request.path, request.old_text, request.new_text)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/copy_file")
+async def copy_file(request: CopyFileRequest):
+    """Копирование файла"""
+    result = tool_executor.copy_file(request.source_path, request.dest_path)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/move_file")
+async def move_file(request: MoveFileRequest):
+    """Перемещение/переименование файла"""
+    result = tool_executor.move_file(request.source_path, request.dest_path)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/db_add_connection")
+async def db_add_connection(request: DatabaseConnectionRequest):
+    """Добавить подключение к БД"""
+    connection_params = {
+        "host": request.host,
+        "database": request.database,
+        "user": request.user,
+        "password": request.password,
+        "port": request.port
+    }
+    result = db_manager.add_connection(request.name, connection_params)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/db_execute_query")
+async def db_execute_query(request: DatabaseQueryRequest):
+    """Выполнить SQL запрос"""
+    result = db_manager.execute_query(request.connection_name, request.query, request.params)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/db_get_schema")
+async def db_get_schema(request: DatabaseSchemaRequest):
+    """Получить схему БД"""
+    result = db_manager.get_schema_info(request.connection_name, request.table_name)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/memory_init")
+async def memory_init(request: MemoryInitRequest):
+    """Инициализация схемы памяти в PostgreSQL"""
+    if not MEMORY_POSTGRES_AVAILABLE:
+        raise HTTPException(status_code=400, detail="PostgreSQL memory not available")
+    
+    # Устанавливаем подключение для памяти
+    postgres_memory.connection_name = request.connection_name
+    result = postgres_memory.initialize_schema()
+    
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.post("/tools/memory_search")
+async def memory_search(request: MemorySearchRequest):
+    """Поиск в памяти агента"""
+    if not MEMORY_POSTGRES_AVAILABLE:
+        raise HTTPException(status_code=400, detail="PostgreSQL memory not available")
+    
+    result = postgres_memory.search_messages(request.session_id, request.query, request.limit)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.get("/tools/memory_status")
+async def memory_status():
+    """Статус системы памяти"""
+    return {
+        "postgres_available": MEMORY_POSTGRES_AVAILABLE,
+        "memory_type": "PostgreSQL" if MEMORY_POSTGRES_AVAILABLE else "File-based",
+        "features": {
+            "persistent_storage": True,
+            "full_text_search": MEMORY_POSTGRES_AVAILABLE,
+            "knowledge_base": MEMORY_POSTGRES_AVAILABLE,
+            "session_management": True
+        }
+    }
+
+
 @app.get("/audit/recent")
 async def get_recent_audit(limit: int = 100):
     """Получить последние действия из audit log"""
@@ -129,14 +336,19 @@ async def get_config():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=AgentConfig.TOOL_SERVER_PORT, help="Port to run on")
+    args = parser.parse_args()
+    
     print(f"🔧 Tool Server starting...")
     print(f"📁 Workspace: {SecurityConfig.WORKSPACE_ROOT}")
     print(f"🔒 Access Level: {AgentConfig.CURRENT_ACCESS_LEVEL}")
-    print(f"🌐 Server: http://localhost:{AgentConfig.TOOL_SERVER_PORT}")
+    print(f"🌐 Server: http://localhost:{args.port}")
     
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=AgentConfig.TOOL_SERVER_PORT,
+        port=args.port,
         log_level="info"
     )

@@ -54,7 +54,16 @@ class SecurityConfig:
         """Проверка что путь внутри workspace"""
         try:
             resolved = path.resolve()
-            return resolved.is_relative_to(cls.WORKSPACE_ROOT)
+            # Для совместимости с Python < 3.9
+            try:
+                return resolved.is_relative_to(cls.WORKSPACE_ROOT)
+            except AttributeError:
+                # Fallback для старых версий Python
+                try:
+                    resolved.relative_to(cls.WORKSPACE_ROOT)
+                    return True
+                except ValueError:
+                    return False
         except (ValueError, OSError):
             return False
     

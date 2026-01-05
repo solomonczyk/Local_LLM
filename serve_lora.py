@@ -3,11 +3,15 @@
 Запускает на http://localhost:8000
 """
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
+
+# Импортируем BitsAndBytesConfig только если CUDA доступна
+if torch.cuda.is_available():
+    from transformers import BitsAndBytesConfig
 
 # Пути
 BASE_MODEL = "Qwen/Qwen2.5-Coder-1.5B"
@@ -17,19 +21,34 @@ app = FastAPI()
 
 # Загрузка модели при старте
 print("Загрузка базовой модели...")
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.float16,
-)
+
+# Проверяем доступность CUDA
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Используем устройство: {device}")
 
 tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-model = AutoModelForCausalLM.from_pretrained(
-    BASE_MODEL,
-    quantization_config=bnb_config,
-    device_map="auto",
-    trust_remote_code=True,
-)
+
+if torch.cuda.is_available():
+    # С CUDA используем квантизацию
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        quantization_config=bnb_config,
+        device_map="auto",
+        trust_remote_code=True,
+    )
+else:
+    # Без CUDA - обычная загрузка на CPU
+    model = AutoModelForCausalLM.from_pretrained(
+        BASE_MODEL,
+        torch_dtype=torch.float32,
+        device_map={"": "cpu"},
+        trust_remote_code=True,
+    )
 
 print("Загрузка LoRA адаптера...")
 model = PeftModel.from_pretrained(model, LORA_PATH)

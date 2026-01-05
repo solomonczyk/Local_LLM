@@ -1,0 +1,9 @@
+{
+  "test_connection": {
+    "host": "localhost",
+    "database": "test_db",
+    "user": "test_user",
+    "password": "***",
+    "port": 5432
+  }
+}

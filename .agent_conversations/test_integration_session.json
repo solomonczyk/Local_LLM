@@ -1,0 +1,16 @@
+{
+  "session_id": "test_integration_session",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Тестовое сообщение",
+      "timestamp": 1767604754.4309297,
+      "metadata": {}
+    }
+  ],
+  "user_preferences": {},
+  "working_directory": ".",
+  "active_files": [],
+  "project_context": {},
+  "last_activity": 1767604754.4309297
+}

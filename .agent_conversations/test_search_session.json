@@ -1,0 +1,34 @@
+{
+  "session_id": "test_search_session",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Я работаю над системой искусственного интеллекта",
+      "timestamp": 1767604675.661464,
+      "metadata": {}
+    },
+    {
+      "role": "user",
+      "content": "Нужно настроить PostgreSQL для хранения данных",
+      "timestamp": 1767604675.7768705,
+      "metadata": {}
+    },
+    {
+      "role": "user",
+      "content": "Создаю агента для автоматизации задач разработки",
+      "timestamp": 1767604675.8855896,
+      "metadata": {}
+    },
+    {
+      "role": "user",
+      "content": "Интегрирую базу данных с системой памяти",
+      "timestamp": 1767604675.9940712,
+      "metadata": {}
+    }
+  ],
+  "user_preferences": {},
+  "working_directory": ".",
+  "active_files": [],
+  "project_context": {},
+  "last_activity": 1767604675.9940712
+}
