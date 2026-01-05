@@ -334,7 +334,17 @@ class Consilium:
         
         return result_content, stats
     
-    def consult(self, task: str, use_smart_routing: bool = True) -> Dict[str, Any]:
+    def check_llm_health(self, timeout: float = 5.0) -> Dict[str, Any]:
+        """
+        Проверить доступность LLM сервера перед запуском агентов.
+        Использует первого доступного агента для проверки.
+        """
+        if self.agents:
+            first_agent = list(self.agents.values())[0]
+            return first_agent.check_llm_health(timeout)
+        return {"healthy": False, "status": "no_agents", "error": "No agents available"}
+    
+    def consult(self, task: str, use_smart_routing: bool = True, check_health: bool = True) -> Dict[str, Any]:
         """
         Получить мнения агентов по задаче (параллельно)
         
@@ -342,12 +352,14 @@ class Consilium:
         - task: задача для анализа
         - use_smart_routing: использовать ли умный роутинг (по умолчанию True)
           Если False, используется статичный список из CONSILIUM_MODE
+        - check_health: проверять ли доступность LLM перед запуском (по умолчанию True)
         
         Возвращает:
         - opinions: мнения каждого агента
         - director_decision: решение директора (только в CRITICAL)
         - recommendation: финальная рекомендация
         - routing: информация о роутинге (если use_smart_routing=True)
+        - health_check: результат проверки здоровья (если check_health=True)
         """
         from concurrent.futures import ThreadPoolExecutor, as_completed
         import time
@@ -356,6 +368,20 @@ class Consilium:
         opinions = {}
         kb_stats_all = {}
         routing_info = None
+        health_result = None
+        
+        # Health check перед запуском
+        if check_health:
+            health_result = self.check_llm_health(timeout=5.0)
+            if not health_result["healthy"]:
+                print(f"[HEALTH] LLM health check FAILED: {health_result.get('error', 'unknown')}")
+                return {
+                    "success": False,
+                    "error": "LLM service unavailable",
+                    "health_check": health_result,
+                    "task": task
+                }
+            print(f"[HEALTH] LLM healthy, response_time={health_result.get('response_time_ms', 0)}ms")
         
         # Smart routing: выбираем агентов по содержимому задачи
         if use_smart_routing:
@@ -464,6 +490,10 @@ class Consilium:
                 "smart_routing": False,
                 "static_mode": self.mode
             }
+        
+        # Добавляем health check результат
+        if health_result:
+            result["health_check"] = health_result
         
         return result
     

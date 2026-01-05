@@ -232,6 +232,60 @@ class Agent:
         """Вызов LLM (публичный метод для обратной совместимости)"""
         return self._call_llm(messages, max_tokens)
     
+    def check_llm_health(self, timeout: float = 5.0) -> Dict[str, Any]:
+        """
+        Проверить доступность LLM сервера.
+        
+        Returns:
+            {
+                "healthy": bool,
+                "status": str,
+                "response_time_ms": float (если healthy),
+                "error": str (если не healthy)
+            }
+        """
+        start = time.perf_counter()
+        try:
+            # Пробуем /health endpoint
+            response = requests.get(
+                f"{self.llm_url.rstrip('/v1')}/health",
+                timeout=timeout
+            )
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "healthy": True,
+                    "status": data.get("status", "ok"),
+                    "response_time_ms": round(elapsed_ms, 1),
+                    "model_loaded": data.get("model_loaded", True)
+                }
+            else:
+                return {
+                    "healthy": False,
+                    "status": f"HTTP {response.status_code}",
+                    "error": response.text[:200]
+                }
+        except requests.exceptions.ConnectionError as e:
+            return {
+                "healthy": False,
+                "status": "connection_error",
+                "error": str(e)[:200]
+            }
+        except requests.exceptions.Timeout:
+            return {
+                "healthy": False,
+                "status": "timeout",
+                "error": f"Health check timed out after {timeout}s"
+            }
+        except Exception as e:
+            return {
+                "healthy": False,
+                "status": "error",
+                "error": str(e)[:200]
+            }
+    
     def read_file(self, path: str) -> Dict[str, Any]:
         """Чтение файла через tool server"""
         try:

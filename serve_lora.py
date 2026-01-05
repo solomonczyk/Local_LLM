@@ -127,6 +127,22 @@ async def list_models():
         }]
     }
 
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint для проверки доступности сервера"""
+    return {
+        "status": "healthy",
+        "model_loaded": model is not None,
+        "model_name": "qwen2.5-coder-lora"
+    }
+
+
+@app.get("/v1/health")
+async def health_check_v1():
+    """Health check endpoint (OpenAI-style path)"""
+    return await health_check()
+
 if __name__ == "__main__":
     print("\n🚀 Сервер запущен на http://localhost:8000")
     print("📝 OpenAI API endpoint: http://localhost:8000/v1")
