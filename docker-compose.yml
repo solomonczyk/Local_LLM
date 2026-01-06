@@ -70,11 +70,11 @@ services:
     image: nginx:alpine
     container_name: agent-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"   # HTTP на альтернативном порту
+      - "8443:443"  # HTTPS на альтернативном порту
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx-https.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro  # SSL сертификаты
     networks:
       - agent-network
     depends_on:

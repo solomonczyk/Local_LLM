@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 23.11.0
+    hooks:
+      - id: black
+        args: [--line-length=120]
+        exclude: ^(codesearchnet_python_1pct|lora_qwen2_5_coder_1_5b_python)/
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=120]
+        exclude: ^(codesearchnet_python_1pct|lora_qwen2_5_coder_1_5b_python)/
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        args: [--max-line-length=120, --extend-ignore=E203,W503]
+        exclude: ^(codesearchnet_python_1pct|lora_qwen2_5_coder_1_5b_python)/
+
+  - repo: local
+    hooks:
+      - id: check-env-vars
+        name: Check for hardcoded secrets
+        entry: python -c "import re, sys; [sys.exit(1) for f in sys.argv[1:] if re.search(r'(password|secret|key)\s*=\s*[\"\']\w+', open(f).read(), re.I)]"
+        language: system
+        files: \.py$
+        exclude: ^(codesearchnet_python_1pct|lora_qwen2_5_coder_1_5b_python|\.env\.example)/

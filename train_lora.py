@@ -15,6 +15,7 @@ MODEL_ID = "Qwen/Qwen2.5-Coder-1.5B"
 # Reduce VRAM pressure (important for 5GB)
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
+
 def main():
     ds = load_from_disk(DATA_DIR)
 
@@ -74,7 +75,7 @@ def main():
         peft_config=lora_config,
         args=sft_config,
     )
-    
+
     # Force LoRA parameters to float16
     for name, param in trainer.model.named_parameters():
         if param.requires_grad:
@@ -84,6 +85,7 @@ def main():
     trainer.save_model(OUT_DIR)
     tokenizer.save_pretrained(OUT_DIR)
     print("DONE. Saved to:", OUT_DIR)
+
 
 if __name__ == "__main__":
     main()

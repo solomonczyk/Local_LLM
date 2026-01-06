@@ -23,11 +23,13 @@ app = FastAPI()
 # URL tool сервера
 TOOL_SERVER_URL = "http://localhost:8001"
 
+
 class ChatRequest(BaseModel):
     model: str
     messages: list
     temperature: float = 0.7
     max_tokens: int = 512
+
 
 class CompletionRequest(BaseModel):
     model: str
@@ -35,107 +37,89 @@ class CompletionRequest(BaseModel):
     temperature: float = 0.7
     max_tokens: int = 512
 
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
     # Имитируем обработку
     await asyncio.sleep(0.5)
-    
+
     # Получаем последнее сообщение пользователя
     user_message = ""
     for msg in reversed(request.messages):
         if msg.get("role") == "user":
             user_message = msg.get("content", "")
             break
-    
+
     # Простые ответы на основе ключевых слов
     response = generate_mock_response(user_message)
-    
+
     return {
         "id": "mock-" + str(int(time.time())),
         "object": "chat.completion",
         "model": request.model,
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": response
-            },
-            "finish_reason": "stop"
-        }]
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
     }
+
 
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest):
     await asyncio.sleep(0.5)
     response = generate_mock_response(request.prompt)
-    
+
     return {
         "id": "mock-" + str(int(time.time())),
         "object": "text_completion",
         "model": request.model,
-        "choices": [{
-            "text": response,
-            "index": 0,
-            "finish_reason": "stop"
-        }]
+        "choices": [{"text": response, "index": 0, "finish_reason": "stop"}],
     }
+
 
 @app.get("/v1/models")
 async def list_models():
-    return {
-        "object": "list",
-        "data": [{
-            "id": "mock-model",
-            "object": "model",
-            "owned_by": "local"
-        }]
-    }
+    return {"object": "list", "data": [{"id": "mock-model", "object": "model", "owned_by": "local"}]}
+
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint для проверки доступности сервера"""
-    return {
-        "status": "healthy",
-        "model_loaded": True,
-        "model_name": "mock-model"
-    }
+    return {"status": "healthy", "model_loaded": True, "model_name": "mock-model"}
+
 
 @app.get("/v1/health")
 async def health_check_v1():
     """Health check endpoint (OpenAI-style path)"""
     return await health_check()
 
+
 def generate_mock_response(text: str) -> str:
     """Генерирует mock ответ на основе ключевых слов"""
     text_lower = text.lower()
-    
+
     # Проверяем системные запросы
     if any(word in text_lower for word in ["диск", "disk", "drive", "hdd", "ssd"]):
         try:
             # Пытаемся получить реальную информацию о дисках
-            response = requests.post(
-                f"{TOOL_SERVER_URL}/tools/system_info",
-                json={"info_type": "disks"},
-                timeout=5
-            )
+            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "disks"}, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success") and "disks" in data:
                     disks_info = []
                     for disk in data["disks"]:
                         if "status" in disk:
-                            disks_info.append(f"🔒 {disk['device']} ({disk['mountpoint']}) - {disk['fstype']} - Доступ ограничен")
+                            disks_info.append(
+                                f"🔒 {disk['device']} ({disk['mountpoint']}) - {disk['fstype']} - Доступ ограничен"
+                            )
                         else:
                             disks_info.append(
                                 f"💾 {disk['device']} ({disk['mountpoint']}) - {disk['fstype']}\n"
                                 f"   Размер: {disk['total_gb']} ГБ, Использовано: {disk['used_gb']} ГБ ({disk['percent_used']}%)\n"
                                 f"   Свободно: {disk['free_gb']} ГБ"
                             )
-                    
+
                     return f"📊 Информация о дисках на вашем ПК:\n\n" + "\n\n".join(disks_info)
         except Exception as e:
             pass
-        
+
         # Fallback если tool сервер недоступен
         return """📊 Для получения информации о дисках нужен доступ к системным инструментам.
         
@@ -149,11 +133,7 @@ python -m agent_system.tool_server"""
 
     elif any(word in text_lower for word in ["память", "memory", "ram", "оперативн", "сколько памяти"]):
         try:
-            response = requests.post(
-                f"{TOOL_SERVER_URL}/tools/system_info",
-                json={"info_type": "memory"},
-                timeout=5
-            )
+            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "memory"}, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -164,16 +144,12 @@ python -m agent_system.tool_server"""
 🔄 Используется: {data['used_gb']} ГБ ({data['percent_used']}%)"""
         except Exception:
             pass
-            
+
         return "🧠 Для получения информации о памяти нужен доступ к системным инструментам."
 
     elif any(word in text_lower for word in ["сеть", "network", "ip", "интерфейс"]):
         try:
-            response = requests.post(
-                f"{TOOL_SERVER_URL}/tools/network_info",
-                json={},
-                timeout=5
-            )
+            response = requests.post(f"{TOOL_SERVER_URL}/tools/network_info", json={}, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -184,7 +160,7 @@ python -m agent_system.tool_server"""
                             for addr in iface["addresses"]:
                                 addr_list.append(f"{addr['type']}: {addr['address']}")
                             interfaces_info.append(f"🌐 {iface['name']}: {', '.join(addr_list)}")
-                    
+
                     stats = data["statistics"]
                     return f"""🌐 Сетевая информация:
 
@@ -195,16 +171,12 @@ python -m agent_system.tool_server"""
 📥 Получено: {stats['bytes_recv']:,} байт ({stats['packets_recv']:,} пакетов)"""
         except Exception:
             pass
-            
+
         return "🌐 Для получения сетевой информации нужен доступ к системным инструментам."
 
     elif any(word in text_lower for word in ["процесс", "process", "задач", "task"]):
         try:
-            response = requests.post(
-                f"{TOOL_SERVER_URL}/tools/system_info",
-                json={"info_type": "processes"},
-                timeout=5
-            )
+            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "processes"}, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -215,37 +187,34 @@ python -m agent_system.tool_server"""
                             f"CPU: {proc.get('cpu_percent', 0):.1f}%, "
                             f"RAM: {proc.get('memory_percent', 0):.1f}%"
                         )
-                    
+
                     return f"🔄 Топ процессов по использованию CPU:\n\n" + "\n".join(processes_info)
         except Exception:
             pass
-            
+
         return "🔄 Для получения информации о процессах нужен доступ к системным инструментам."
 
     # Файловые операции
     elif any(word in text_lower for word in ["прочитай файл", "read file", "покажи содержимое", "открой файл"]):
         # Ищем путь к файлу в тексте
         import re
+
         file_patterns = [
             r'["\']([^"\']+\.[a-zA-Z0-9]+)["\']',  # "file.txt"
-            r'файл\s+([^\s]+\.[a-zA-Z0-9]+)',      # файл test.py
-            r'([^\s]+\.(?:py|txt|md|json|yaml|yml|js|ts|html|css))',  # расширения файлов
+            r"файл\s+([^\s]+\.[a-zA-Z0-9]+)",  # файл test.py
+            r"([^\s]+\.(?:py|txt|md|json|yaml|yml|js|ts|html|css))",  # расширения файлов
         ]
-        
+
         file_path = None
         for pattern in file_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 file_path = match.group(1)
                 break
-        
+
         if file_path:
             try:
-                response = requests.post(
-                    f"{TOOL_SERVER_URL}/tools/read_file",
-                    json={"path": file_path},
-                    timeout=5
-                )
+                response = requests.post(f"{TOOL_SERVER_URL}/tools/read_file", json={"path": file_path}, timeout=5)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
@@ -270,26 +239,23 @@ print("Hello World")'
 
     elif any(word in text_lower for word in ["удали файл", "delete file", "remove file"]):
         import re
+
         file_patterns = [
             r'["\']([^"\']+\.[a-zA-Z0-9]+)["\']',
-            r'файл\s+([^\s]+\.[a-zA-Z0-9]+)',
-            r'([^\s]+\.(?:py|txt|md|json|yaml|yml|js|ts|html|css))',
+            r"файл\s+([^\s]+\.[a-zA-Z0-9]+)",
+            r"([^\s]+\.(?:py|txt|md|json|yaml|yml|js|ts|html|css))",
         ]
-        
+
         file_path = None
         for pattern in file_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 file_path = match.group(1)
                 break
-        
+
         if file_path:
             try:
-                response = requests.post(
-                    f"{TOOL_SERVER_URL}/tools/delete_file",
-                    json={"path": file_path},
-                    timeout=5
-                )
+                response = requests.post(f"{TOOL_SERVER_URL}/tools/delete_file", json={"path": file_path}, timeout=5)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
@@ -303,11 +269,7 @@ print("Hello World")'
 
     elif any(word in text_lower for word in ["список файлов", "list files", "покажи файлы", "что в папке"]):
         try:
-            response = requests.post(
-                f"{TOOL_SERVER_URL}/tools/list_dir",
-                json={"path": ".", "pattern": "*"},
-                timeout=5
-            )
+            response = requests.post(f"{TOOL_SERVER_URL}/tools/list_dir", json={"path": ".", "pattern": "*"}, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -316,7 +278,7 @@ print("Hello World")'
                         icon = "📁" if file_info["is_dir"] else "📄"
                         size = f" ({file_info['size']} байт)" if not file_info["is_dir"] else ""
                         files_info.append(f"{icon} {file_info['name']}{size}")
-                    
+
                     return f"📂 Файлы в текущей директории:\n\n" + "\n".join(files_info)
             else:
                 return f"❌ Не удалось получить список файлов: {response.text}"
@@ -429,8 +391,10 @@ print("Hello World")'
 
 Нужны дополнительные детали по какому-то из этапов?"""
 
+
 if __name__ == "__main__":
     import asyncio
+
     print("\n🚀 Mock сервер запущен на http://localhost:8000")
     print("📝 OpenAI API endpoint: http://localhost:8000/v1")
     print("⚠️  Это тестовый сервер с заготовленными ответами")

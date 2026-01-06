@@ -55,17 +55,20 @@ model = PeftModel.from_pretrained(model, LORA_PATH)
 model.eval()
 print("✅ Модель готова!")
 
+
 class ChatRequest(BaseModel):
     model: str
     messages: list
     temperature: float = 0.7
     max_tokens: int = 512
 
+
 class CompletionRequest(BaseModel):
     model: str
     prompt: str
     temperature: float = 0.7
     max_tokens: int = 512
+
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
@@ -80,9 +83,9 @@ async def chat_completions(request: ChatRequest):
             prompt += f"User: {content}\n"
         elif role == "assistant":
             prompt += f"Assistant: {content}\n"
-    
+
     prompt += "Assistant:"
-    
+
     # Генерация
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
@@ -93,22 +96,16 @@ async def chat_completions(request: ChatRequest):
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
         )
-    
-    response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-    
+
+    response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
+
     return {
         "id": "local",
         "object": "chat.completion",
         "model": request.model,
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": response
-            },
-            "finish_reason": "stop"
-        }]
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
     }
+
 
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest):
@@ -121,46 +118,33 @@ async def completions(request: CompletionRequest):
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
         )
-    
-    response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-    
+
+    response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
+
     return {
         "id": "local",
         "object": "text_completion",
         "model": request.model,
-        "choices": [{
-            "text": response,
-            "index": 0,
-            "finish_reason": "stop"
-        }]
+        "choices": [{"text": response, "index": 0, "finish_reason": "stop"}],
     }
+
 
 @app.get("/v1/models")
 async def list_models():
-    return {
-        "object": "list",
-        "data": [{
-            "id": "qwen2.5-coder-lora",
-            "object": "model",
-            "owned_by": "local"
-        }]
-    }
+    return {"object": "list", "data": [{"id": "qwen2.5-coder-lora", "object": "model", "owned_by": "local"}]}
 
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint для проверки доступности сервера"""
-    return {
-        "status": "healthy",
-        "model_loaded": model is not None,
-        "model_name": "qwen2.5-coder-lora"
-    }
+    return {"status": "healthy", "model_loaded": model is not None, "model_name": "qwen2.5-coder-lora"}
 
 
 @app.get("/v1/health")
 async def health_check_v1():
     """Health check endpoint (OpenAI-style path)"""
     return await health_check()
+
 
 if __name__ == "__main__":
     print("\n🚀 Сервер запущен на http://localhost:8000")
