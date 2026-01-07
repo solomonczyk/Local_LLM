@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install linters
+        run: |
+          pip install flake8 black isort
+      
+      - name: Check formatting (black)
+        run: black --check --diff agent_system/ agent_runtime/ tools/
+        continue-on-error: true
+      
+      - name: Check imports (isort)
+        run: isort --check-only --diff agent_system/ agent_runtime/ tools/
+        continue-on-error: true
+      
+      - name: Lint (flake8)
+        run: flake8 agent_system/ agent_runtime/ tools/ --max-line-length=120 --ignore=E501,W503
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short
+        env:
+          DIRECTOR_ACTIVE_MODE: "false"
+          SHADOW_DIRECTOR_ENABLED: "false"
+
+  security-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for secrets
+        run: |
+          # Check for hardcoded API keys
+          if grep -rE "sk-[a-zA-Z0-9]{20,}" --include="*.py" --include="*.md" .; then
+            echo "::error::Potential API key found in code!"
+            exit 1
+          fi
+          
+          # Check for hardcoded passwords
+          if grep -rE "password\s*=\s*['\"][^'\"]+['\"]" --include="*.py" . | grep -v "your_" | grep -v "example" | grep -v "test"; then
+            echo "::warning::Potential hardcoded password found"
+          fi
+          
+          echo "Security check passed"
