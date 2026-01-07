@@ -12,6 +12,7 @@ sqlalchemy==2.0.23
 # HTTP clients
 requests==2.32.4
 httpx==0.25.2
+openai>=1.0.0
 
 # Data processing
 pandas==2.0.3

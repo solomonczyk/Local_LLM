@@ -22,7 +22,7 @@ from agent_system.shadow_director import shadow_director
 class Consilium:
     """Консилиум специализированных агентов"""
 
-    def __init__(self, llm_url: str = "http://localhost:8000/v1", tool_url: str = "http://localhost:8001"):
+    def __init__(self, llm_url: str = "http://localhost:8010/v1", tool_url: str = "http://localhost:8011"):
         self.llm_url = llm_url
         self.tool_url = tool_url
 

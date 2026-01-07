@@ -146,19 +146,29 @@ class Agent:
     TIMING_WINDOW = 20
 
     def __init__(self, name: str = "Agent", role: str = "Generic Agent", 
-                 llm_url: str = "http://localhost:8000/v1", 
-                 tool_url: str = "http://localhost:8001"):
+                 llm_url: str = "http://localhost:8010/v1", 
+                 tool_url: str = "http://localhost:8011"):
         """Инициализация агента"""
         self.name = name
         self.role = role
         self.llm_url = llm_url
         self.tool_url = tool_url
         
-        # Метрики
+        # Метрики LLM
         self._llm_times = deque(maxlen=self.TIMING_WINDOW)
         self._llm_call_count = 0
         self._retry_count = 0
         self._max_retries = 3
+        self._retry_base_delay = 1.0
+        self._retry_max_delay = 10.0
+        
+        # Метрики retrieval
+        self._retrieval_times = deque(maxlen=self.TIMING_WINDOW)
+        self._retrieval_call_count = 0
+        
+        # Repo snapshot cache
+        self.repo_snapshot = None
+        self.conversation_history = []
 
     def _call_llm_once(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
         """Один вызов LLM без retry (внутренний метод)"""
