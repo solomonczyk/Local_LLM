@@ -1,0 +1,120 @@
+{
+  "report_date": "2026-01-07T14:37:01.455769",
+  "report_type": "director_day1_summary",
+  "totals": {
+    "total_tasks": 50,
+    "director_calls": 15,
+    "overrides_applied": 8,
+    "errors": 0
+  },
+  "rates": {
+    "director_usage_rate": 0.3,
+    "override_rate": 0.5333333333333333
+  },
+  "mode_changes": {
+    "count": 3,
+    "events": [
+      {
+        "task_id": 22,
+        "from": "active",
+        "to": "shadow",
+        "reason": "circuit_breaker_triggered"
+      },
+      {
+        "task_id": 33,
+        "from": "shadow",
+        "to": "active",
+        "reason": "circuit_breaker_triggered"
+      },
+      {
+        "task_id": 44,
+        "from": "active",
+        "to": "shadow",
+        "reason": "circuit_breaker_triggered"
+      }
+    ]
+  },
+  "economics": {
+    "total_tokens": 45484,
+    "avg_tokens_per_call": 3032.3,
+    "total_cost_usd": 0.012854,
+    "avg_cost_per_call_usd": 0.000857,
+    "daily_cost_projection_usd": 0.0129
+  },
+  "performance": {
+    "avg_latency_sec": 2.64,
+    "min_latency_sec": 2.12,
+    "max_latency_sec": 5.19
+  },
+  "top_override_reasons": [
+    {
+      "reason": "high_risk",
+      "count": 7
+    },
+    {
+      "reason": "low_consilium_confidence",
+      "count": 1
+    }
+  ],
+  "domain_breakdown": {
+    "dev": {
+      "tasks": 46,
+      "director_calls": 12,
+      "overrides": 7,
+      "override_rate": 0.5833333333333334
+    },
+    "seo": {
+      "tasks": 4,
+      "director_calls": 0,
+      "overrides": 0,
+      "override_rate": 0.0
+    },
+    "ux": {
+      "tasks": 6,
+      "director_calls": 2,
+      "overrides": 0,
+      "override_rate": 0.0
+    },
+    "architect": {
+      "tasks": 12,
+      "director_calls": 5,
+      "overrides": 3,
+      "override_rate": 0.6
+    },
+    "security": {
+      "tasks": 15,
+      "director_calls": 12,
+      "overrides": 7,
+      "override_rate": 0.5833333333333334
+    },
+    "qa": {
+      "tasks": 9,
+      "director_calls": 1,
+      "overrides": 0,
+      "override_rate": 0.0
+    }
+  },
+  "circuit_breaker": {
+    "final_mode": "shadow",
+    "status": {
+      "current_mode": "shadow",
+      "total_calls": 15,
+      "rolling_metrics": {
+        "calls_count_20": 15,
+        "calls_count_day": 15,
+        "override_rate_20": 0.5333333333333333,
+        "error_rate_20": 0.0,
+        "avg_latency_20": 2.642,
+        "daily_cost": 0.012853500000000002,
+        "avg_confidence_diff_20": 0.19733333333333333
+      },
+      "limits": {
+        "override_rate_max": 0.75,
+        "daily_cost_max": 0.01,
+        "error_rate_max": 0.1,
+        "latency_max": 6.0
+      },
+      "health": "degraded"
+    }
+  }
+}

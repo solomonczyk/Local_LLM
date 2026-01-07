@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -16,7 +17,7 @@ from .smart_routing import route_agents
 # Добавляем путь для импорта agent_system
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from agent_system.config import AgentConfig
-
+from agent_system.shadow_director import shadow_director
 
 class Consilium:
     """Консилиум специализированных агентов"""
@@ -236,6 +237,15 @@ class Consilium:
         if health_result:
             result["health_check"] = health_result
 
+        # 🎯 ACTIVE DIRECTOR - с override gating
+        from agent_system.active_director import active_director
+        result = active_director.run_active_analysis(result)
+        
+        if result.get("active_director", {}).get("active_director_used"):
+            override_applied = result.get("active_director", {}).get("override_applied", False)
+            override_reason = result.get("active_director", {}).get("override_reason", "")
+            print(f"[ACTIVE] Director used, override: {override_applied} ({override_reason})")
+
         return result
 
     def _specialize_task(self, task: str, agent_name: str) -> str:
@@ -288,8 +298,6 @@ Use this knowledge base to inform your analysis."""
     def _extract_confidence(self, opinion: str) -> float:
         """Извлечь уровень уверенности из мнения (0-10)"""
         # Простая эвристика: ищем числа в тексте
-        import re
-
         matches = re.findall(r"\b([0-9]|10)\b", opinion)
         if matches:
             try:
@@ -377,10 +385,8 @@ Be concise and decisive."""
             **kb_stats,  # Добавляем статистику KB
         }
 
-
 # Lazy singleton - создаётся один раз при первом вызове get_consilium()
 _consilium_instance: Optional[Consilium] = None
-
 
 def get_consilium() -> Consilium:
     """Получить singleton экземпляр консилиума (lazy init)"""
@@ -388,7 +394,6 @@ def get_consilium() -> Consilium:
     if _consilium_instance is None:
         _consilium_instance = Consilium()
     return _consilium_instance
-
 
 # Для обратной совместимости - property-like доступ
 # Использовать get_consilium() вместо consilium напрямую

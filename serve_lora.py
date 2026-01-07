@@ -55,20 +55,17 @@ model = PeftModel.from_pretrained(model, LORA_PATH)
 model.eval()
 print("✅ Модель готова!")
 
-
 class ChatRequest(BaseModel):
     model: str
     messages: list
     temperature: float = 0.7
     max_tokens: int = 512
 
-
 class CompletionRequest(BaseModel):
     model: str
     prompt: str
     temperature: float = 0.7
     max_tokens: int = 512
-
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
@@ -106,7 +103,6 @@ async def chat_completions(request: ChatRequest):
         "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
     }
 
-
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest):
     inputs = tokenizer(request.prompt, return_tensors="pt").to(model.device)
@@ -128,23 +124,19 @@ async def completions(request: CompletionRequest):
         "choices": [{"text": response, "index": 0, "finish_reason": "stop"}],
     }
 
-
 @app.get("/v1/models")
 async def list_models():
     return {"object": "list", "data": [{"id": "qwen2.5-coder-lora", "object": "model", "owned_by": "local"}]}
-
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint для проверки доступности сервера"""
     return {"status": "healthy", "model_loaded": model is not None, "model_name": "qwen2.5-coder-lora"}
 
-
 @app.get("/v1/health")
 async def health_check_v1():
     """Health check endpoint (OpenAI-style path)"""
     return await health_check()
-
 
 if __name__ == "__main__":
     print("\n🚀 Сервер запущен на http://localhost:8000")

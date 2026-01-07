@@ -3,7 +3,6 @@
 """
 from agent_runtime.orchestrator.consilium import route_agents, get_consilium
 
-
 def test_route_agents():
     """Тест функции route_agents"""
     print("=" * 60)
@@ -39,7 +38,6 @@ def test_route_agents():
     print("\n" + "=" * 60)
     print("All route_agents tests passed!")
     print("=" * 60)
-
 
 def test_consult_with_routing():
     """Тест consult() с smart routing (без LLM - только структура)"""
@@ -94,7 +92,6 @@ def test_consult_with_routing():
     print("\n" + "=" * 60)
     print("All consult routing tests passed!")
     print("=" * 60)
-
 
 if __name__ == "__main__":
     test_route_agents()

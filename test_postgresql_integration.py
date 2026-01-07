@@ -5,7 +5,6 @@
 import requests
 import json
 
-
 def test_postgres_availability():
     """Проверка доступности PostgreSQL модуля"""
     print("=== Testing PostgreSQL Availability ===")
@@ -20,7 +19,6 @@ def test_postgres_availability():
         print("❌ psycopg2 не установлен")
         print("💡 Установите командой: pip install psycopg2-binary")
         return False
-
 
 def test_database_tools_import():
     """Тест импорта database tools"""
@@ -39,7 +37,6 @@ def test_database_tools_import():
     except ImportError as e:
         print(f"❌ Ошибка импорта database tools: {e}")
         return False
-
 
 def test_database_conversation():
     """Тест диалога о базах данных"""
@@ -81,7 +78,6 @@ def test_database_conversation():
     print(f"\n📊 Результат диалогов о БД: {passed}/{len(database_queries)}")
     return passed == len(database_queries)
 
-
 def test_tool_server_db_endpoints():
     """Тест эндпоинтов БД в tool сервере"""
     print("\n=== Testing Tool Server DB Endpoints ===")
@@ -108,7 +104,6 @@ def test_tool_server_db_endpoints():
 
     print(f"\n📊 Доступные эндпоинты БД: {available_endpoints}/{len(endpoints_to_test)}")
     return available_endpoints == len(endpoints_to_test)
-
 
 def test_database_security():
     """Тест безопасности БД операций"""
@@ -165,13 +160,11 @@ def test_database_security():
         print(f"❌ Не удалось импортировать database tools: {e}")
         return False
 
-
 def test_database_config_management():
     """Тест управления конфигурациями БД"""
     print("\n=== Testing Database Config Management ===")
 
     try:
-        from agent_system.database_tools import DatabaseManager
 
         db_mgr = DatabaseManager()
 
@@ -209,7 +202,6 @@ def test_database_config_management():
     except Exception as e:
         print(f"❌ Ошибка тестирования конфигураций: {e}")
         return False
-
 
 def main():
     """Запуск всех тестов PostgreSQL интеграции"""
@@ -255,7 +247,6 @@ def main():
         print("\n❌ ТРЕБУЕТСЯ ДОРАБОТКА PostgreSQL интеграции")
 
     return success_rate >= 60
-
 
 if __name__ == "__main__":
     success = main()

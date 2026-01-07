@@ -28,7 +28,6 @@ Rules:
 - Include 8-10 unit tests (pytest).
 Write clean, production-quality code with docstrings."""
 
-
 inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
 with torch.no_grad():
@@ -40,6 +39,5 @@ with torch.no_grad():
         top_p=0.95,
         pad_token_id=tokenizer.eos_token_id,
     )
-
 
 print(tokenizer.decode(output[0], skip_special_tokens=True))

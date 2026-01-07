@@ -7,7 +7,6 @@ from typing import Any, Dict
 from .audit import audit_logger
 from .config import AgentConfig, SecurityConfig
 
-
 class SystemTools:
     """Инструменты для системных операций"""
 
@@ -200,8 +199,6 @@ class SystemTools:
         """Получение сетевой информации"""
         try:
             import socket
-
-            import psutil
 
             # Сетевые интерфейсы
             interfaces = []

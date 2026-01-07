@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from agent_system.file_tools import FileTools
 
-
 class TestFileTools(unittest.TestCase):
     """Test cases for FileTools"""
 
@@ -165,7 +164,6 @@ class TestFileTools(unittest.TestCase):
         found_files = result["files"]
         self.assertIn("test1.py", found_files)
         self.assertIn("test3.txt", found_files)
-
 
 if __name__ == "__main__":
     unittest.main()

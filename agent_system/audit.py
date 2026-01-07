@@ -8,7 +8,6 @@ from typing import Any, Dict
 
 from .config import SecurityConfig
 
-
 class AuditLogger:
     """Логирование всех действий агентов"""
 
@@ -49,7 +48,6 @@ class AuditLogger:
                 continue
 
         return actions
-
 
 # Глобальный экземпляр
 audit_logger = AuditLogger()

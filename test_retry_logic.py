@@ -7,7 +7,6 @@ import requests
 from agent_runtime.orchestrator.agent import Agent, get_llm_circuit_breaker, CircuitBreaker
 import agent_runtime.orchestrator.agent as agent_module
 
-
 def test_retry_config():
     """Тест конфигурации retry"""
     print("=" * 60)
@@ -30,7 +29,6 @@ def test_retry_config():
     print("Retry config test passed!")
     print("=" * 60)
 
-
 def test_retry_in_timing_stats():
     """Тест что retry метрики есть в timing stats"""
     print("\n" + "=" * 60)
@@ -51,7 +49,6 @@ def test_retry_in_timing_stats():
     print("\n" + "=" * 60)
     print("Retry metrics test passed!")
     print("=" * 60)
-
 
 def test_no_retry_on_connection_error():
     """Тест: connection error НЕ вызывает retry"""
@@ -81,7 +78,6 @@ def test_no_retry_on_connection_error():
     print("No retry on connection error test passed!")
     print("=" * 60)
 
-
 def test_exponential_backoff_calculation():
     """Тест расчёта exponential backoff"""
     print("\n" + "=" * 60)
@@ -103,7 +99,6 @@ def test_exponential_backoff_calculation():
     print("\n" + "=" * 60)
     print("Exponential backoff test passed!")
     print("=" * 60)
-
 
 def test_retry_on_timeout_mock():
     """Тест retry при timeout (с mock)"""
@@ -147,7 +142,6 @@ def test_retry_on_timeout_mock():
     print("Retry on timeout test passed!")
     print("=" * 60)
 
-
 def test_max_retries_exceeded():
     """Тест: превышение max_retries"""
     print("\n" + "=" * 60)
@@ -162,11 +156,6 @@ def test_max_retries_exceeded():
     agent._max_retries = 2
 
     call_count = 0
-
-    def mock_post(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        raise requests.exceptions.Timeout("Always timeout")
 
     with patch("requests.post", side_effect=mock_post):
         result = agent._call_llm([{"role": "user", "content": "test"}])
@@ -183,7 +172,6 @@ def test_max_retries_exceeded():
     print("Max retries exceeded test passed!")
     print("=" * 60)
 
-
 def test_retry_on_5xx_error():
     """Тест retry при 5xx HTTP ошибке"""
     print("\n" + "=" * 60)
@@ -199,20 +187,6 @@ def test_retry_on_5xx_error():
 
     call_count = 0
 
-    def mock_post(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        if call_count < 3:
-            mock_response = MagicMock()
-            mock_response.status_code = 503
-            mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
-            return mock_response
-        # Третий вызов успешен
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"choices": [{"message": {"content": "Success after 503"}}]}
-        return mock_response
-
     with patch("requests.post", side_effect=mock_post):
         result = agent._call_llm([{"role": "user", "content": "test"}])
 
@@ -226,7 +200,6 @@ def test_retry_on_5xx_error():
     print("\n" + "=" * 60)
     print("Retry on 5xx test passed!")
     print("=" * 60)
-
 
 def test_no_retry_on_4xx_error():
     """Тест: 4xx ошибка НЕ вызывает retry"""
@@ -242,15 +215,6 @@ def test_no_retry_on_4xx_error():
 
     call_count = 0
 
-    def mock_post(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.status_code = 400
-        error = requests.exceptions.HTTPError(response=mock_response)
-        mock_response.raise_for_status.side_effect = error
-        return mock_response
-
     with patch("requests.post", side_effect=mock_post):
         result = agent._call_llm([{"role": "user", "content": "test"}])
 
@@ -264,7 +228,6 @@ def test_no_retry_on_4xx_error():
     print("\n" + "=" * 60)
     print("No retry on 4xx test passed!")
     print("=" * 60)
-
 
 if __name__ == "__main__":
     test_retry_config()

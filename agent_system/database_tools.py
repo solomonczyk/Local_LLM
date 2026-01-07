@@ -16,7 +16,6 @@ try:
 except ImportError:
     POSTGRES_AVAILABLE = False
 
-
 class DatabaseManager:
     """Менеджер для работы с базами данных"""
 
@@ -261,7 +260,6 @@ class DatabaseManager:
         """Сохранить конфигурации подключений"""
         with open(self.config_file, "w", encoding="utf-8") as f:
             json.dump(configs, f, indent=2, ensure_ascii=False)
-
 
 # Глобальный менеджер БД
 db_manager = DatabaseManager()

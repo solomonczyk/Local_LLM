@@ -6,7 +6,6 @@ import requests
 import json
 import os
 
-
 def test_create_file():
     """Тест создания файла"""
     print("=== Testing File Creation ===")
@@ -33,7 +32,6 @@ def test_function():
         print(f"❌ Ошибка создания файла: {response.text}")
         return False
 
-
 def test_read_file_via_agent():
     """Тест чтения файла через агента"""
     print("\n=== Testing File Reading via Agent ===")
@@ -58,7 +56,6 @@ def test_read_file_via_agent():
     else:
         print(f"❌ Ошибка запроса к агенту: {response.status_code}")
         return False
-
 
 def test_list_files_via_agent():
     """Тест получения списка файлов через агента"""
@@ -85,7 +82,6 @@ def test_list_files_via_agent():
         print(f"❌ Ошибка запроса к агенту: {response.status_code}")
         return False
 
-
 def test_edit_file():
     """Тест редактирования файла"""
     print("\n=== Testing File Editing ===")
@@ -109,7 +105,6 @@ def test_edit_file():
         print(f"❌ Ошибка редактирования: {response.text}")
         return False
 
-
 def test_copy_file():
     """Тест копирования файла"""
     print("\n=== Testing File Copying ===")
@@ -129,7 +124,6 @@ def test_copy_file():
     else:
         print(f"❌ Ошибка копирования: {response.text}")
         return False
-
 
 def test_delete_file_via_agent():
     """Тест удаления файла через агента"""
@@ -156,7 +150,6 @@ def test_delete_file_via_agent():
         print(f"❌ Ошибка запроса к агенту: {response.status_code}")
         return False
 
-
 def cleanup():
     """Очистка тестовых файлов"""
     print("\n=== Cleanup ===")
@@ -179,7 +172,6 @@ def cleanup():
                 print(f"🗑️  Удален backup: {file}")
             except Exception as e:
                 print(f"⚠️  Не удалось удалить backup {file}: {e}")
-
 
 def main():
     """Запуск всех тестов"""
@@ -220,7 +212,6 @@ def main():
     cleanup()
 
     return passed == total
-
 
 if __name__ == "__main__":
     success = main()

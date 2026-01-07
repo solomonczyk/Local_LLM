@@ -5,7 +5,6 @@
 import requests
 import time
 
-
 def test_conversation_memory():
     """Тест памяти диалога"""
     print("=== Testing Conversation Memory ===")
@@ -57,7 +56,6 @@ def test_conversation_memory():
         print(f"❌ Ошибка первого запроса: {response1.status_code}")
         return False
 
-
 def test_proactive_suggestions():
     """Тест проактивных предложений"""
     print("\n=== Testing Proactive Suggestions ===")
@@ -89,7 +87,6 @@ def test_proactive_suggestions():
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
 
-
 def test_file_operations_with_context():
     """Тест файловых операций с контекстом"""
     print("\n=== Testing File Operations with Context ===")
@@ -117,7 +114,6 @@ def test_file_operations_with_context():
     else:
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
-
 
 def test_system_info_integration():
     """Тест интеграции системной информации"""
@@ -147,7 +143,6 @@ def test_system_info_integration():
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
 
-
 def test_enhanced_mode():
     """Тест улучшенного режима"""
     print("\n=== Testing Enhanced Mode ===")
@@ -167,7 +162,6 @@ def test_enhanced_mode():
     else:
         print(f"❌ Ошибка проверки статуса: {response.status_code}")
         return False
-
 
 def main():
     """Запуск всех тестов естественного взаимодействия"""
@@ -214,7 +208,6 @@ def main():
         print("🔧 Многие функции естественного взаимодействия не работают")
 
     return success_rate >= 80
-
 
 if __name__ == "__main__":
     success = main()

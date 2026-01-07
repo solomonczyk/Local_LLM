@@ -16,7 +16,6 @@ try:
 except ImportError:
     POSTGRES_AVAILABLE = False
 
-
 @dataclass
 class Message:
     """Сообщение в диалоге"""
@@ -29,7 +28,6 @@ class Message:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
-
 @dataclass
 class ConversationContext:
     """Контекст диалога"""
@@ -41,18 +39,6 @@ class ConversationContext:
     active_files: List[str]  # Файлы, с которыми работаем
     project_context: Dict[str, Any]  # Информация о проекте
     last_activity: float
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "session_id": self.session_id,
-            "messages": [msg.to_dict() for msg in self.messages],
-            "user_preferences": self.user_preferences,
-            "working_directory": self.working_directory,
-            "active_files": self.active_files,
-            "project_context": self.project_context,
-            "last_activity": self.last_activity,
-        }
-
 
 class ConversationManager:
     """Управление диалогами и контекстом с поддержкой PostgreSQL"""
@@ -254,7 +240,6 @@ class ConversationManager:
                 summary_parts.append(f"[{timestamp}] {msg.role}: {msg.content[:100]}...")
 
         return "\n".join(summary_parts)
-
 
 # Глобальный менеджер диалогов
 conversation_manager = ConversationManager()

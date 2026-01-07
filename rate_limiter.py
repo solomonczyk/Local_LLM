@@ -7,7 +7,6 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 import asyncio
 
-
 class RateLimiter:
     def __init__(self, requests_per_minute: int = 60, requests_per_hour: int = 1000):
         self.requests_per_minute = requests_per_minute
@@ -53,10 +52,8 @@ class RateLimiter:
         while self.hour_requests[client_ip] and self.hour_requests[client_ip][0] < hour_ago:
             self.hour_requests[client_ip].popleft()
 
-
 # Глобальный rate limiter
 rate_limiter = RateLimiter()
-
 
 async def rate_limit_middleware(request: Request, call_next):
     """Middleware для проверки rate limiting"""

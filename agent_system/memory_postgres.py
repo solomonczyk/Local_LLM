@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional
 from .audit import audit_logger
 from .database_tools import db_manager
 
-
 @dataclass
 class MemoryMessage:
     """Сообщение в памяти агента"""
@@ -27,7 +26,6 @@ class MemoryMessage:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
-
 @dataclass
 class MemorySession:
     """Сессия в памяти агента"""
@@ -38,10 +36,6 @@ class MemorySession:
     last_activity: float
     metadata: Dict[str, Any]
     message_count: int
-
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-
 
 class PostgreSQLMemory:
     """Система памяти агента на PostgreSQL"""
@@ -434,7 +428,6 @@ class PostgreSQLMemory:
 
         except Exception as e:
             return {"success": False, "error": str(e)}
-
 
 # Глобальный экземпляр PostgreSQL памяти
 postgres_memory = PostgreSQLMemory()

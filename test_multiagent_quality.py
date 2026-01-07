@@ -8,7 +8,6 @@ import time
 from typing import Dict, List, Any
 from agent_runtime.orchestrator import get_orchestrator
 
-
 class MultiAgentQualityTester:
     """Тестер качества мультиагентной системы"""
 
@@ -301,7 +300,6 @@ class MultiAgentQualityTester:
             },
         }
 
-
 def main():
     """Основная функция тестирования"""
 
@@ -351,7 +349,6 @@ def main():
     print(f"\n💾 Детальные результаты сохранены в: multiagent_quality_results.json")
 
     return overall_quality >= 6.0
-
 
 if __name__ == "__main__":
     success = main()

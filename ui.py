@@ -2,6 +2,7 @@
 Простой GUI для Agent System
 Запуск: python ui.py
 """
+
 import gradio as gr
 import json
 import os
@@ -14,12 +15,11 @@ sys.path.insert(0, os.path.dirname(__file__))
 from agent_runtime.orchestrator.consilium import get_consilium, route_agents
 from agent_runtime.orchestrator.orchestrator import get_orchestrator
 from agent_runtime.orchestrator.agent import get_llm_circuit_breaker
-
+from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
 
 # Глобальные переменные для контекста
 additional_context = ""
 uploaded_files_content = {}
-
 
 def get_system_status():
     """Получить статус системы"""
@@ -55,7 +55,6 @@ def get_system_status():
     except Exception as e:
         return f"Error getting status: {e}"
 
-
 def preview_routing(task: str):
     """Предпросмотр роутинга без вызова LLM"""
     if not task.strip():
@@ -84,7 +83,6 @@ def preview_routing(task: str):
         return "\n".join(lines)
     except Exception as e:
         return f"Error: {e}"
-
 
 def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, include_context: bool):
     """Выполнить задачу"""
@@ -183,13 +181,11 @@ def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, 
     except Exception as e:
         yield f"Error: {e}"
 
-
 def update_context(text: str):
     """Обновить дополнительный контекст"""
     global additional_context
     additional_context = text
     return f"Context updated ({len(text)} chars)"
-
 
 def handle_file_upload(files):
     """Обработать загруженные файлы"""
@@ -215,13 +211,11 @@ def handle_file_upload(files):
 
     return "\n".join(results)
 
-
 def clear_files():
     """Очистить загруженные файлы"""
     global uploaded_files_content
     uploaded_files_content = {}
     return "Files cleared"
-
 
 # Создаём интерфейс
 with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
@@ -303,7 +297,6 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
 
     # Загружаем статус при старте
     demo.load(fn=get_system_status, outputs=status_output)
-
 
 if __name__ == "__main__":
     import argparse

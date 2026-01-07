@@ -41,3 +41,28 @@ checkpoint-*/
 # TensorBoard
 runs/
 *.tfevents*
+
+# Файлы с секретами
+.env
+.env.local
+.env.production
+*.key
+*.pem
+secrets.json
+config/secrets.yaml
+
+# Логи с потенциальными секретами
+*.log
+logs/
+audit_logs/
+
+# Director/Agent logs (могут содержать чувствительные данные)
+*.jsonl
+task_run.jsonl
+active_director.jsonl
+shadow_director.jsonl
+director_circuit_breaker.jsonl
+
+# Временные файлы безопасности
+security_*.json
+auth_*.txt

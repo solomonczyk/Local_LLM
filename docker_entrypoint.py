@@ -11,7 +11,6 @@ import subprocess
 import threading
 from pathlib import Path
 
-
 class ServiceManager:
     """Менеджер сервисов для Docker контейнера"""
 
@@ -114,7 +113,6 @@ class ServiceManager:
             except Exception as e:
                 print(f"❌ Error stopping {name}: {e}")
 
-
 def setup_environment():
     """Настройка окружения"""
     print("🔧 Setting up environment...")
@@ -138,7 +136,6 @@ def setup_environment():
     for key, value in env_vars.items():
         os.environ[key] = value
         print(f"🔧 Set {key}={value}")
-
 
 def wait_for_postgres():
     """Ожидание доступности PostgreSQL"""
@@ -172,7 +169,6 @@ def wait_for_postgres():
                 time.sleep(2)
             else:
                 print(f"❌ PostgreSQL not available after {max_attempts} attempts")
-
 
 def main():
     """Главная функция"""
@@ -236,7 +232,6 @@ def main():
         print("\n🛑 Shutting down...")
     finally:
         manager.stop_all_services()
-
 
 if __name__ == "__main__":
     main()

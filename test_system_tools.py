@@ -5,7 +5,6 @@
 import requests
 import json
 
-
 def test_disk_info():
     """Тест получения информации о дисках"""
     print("=== Testing Disk Info ===")
@@ -38,7 +37,6 @@ def test_disk_info():
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
 
-
 def test_memory_info():
     """Тест получения информации о памяти"""
     print("\n=== Testing Memory Info ===")
@@ -63,7 +61,6 @@ def test_memory_info():
     else:
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
-
 
 def test_network_info():
     """Тест получения сетевой информации"""
@@ -93,7 +90,6 @@ def test_network_info():
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
 
-
 def test_direct_tool_server():
     """Тест прямого обращения к tool серверу"""
     print("\n=== Testing Direct Tool Server ===")
@@ -118,7 +114,6 @@ def test_direct_tool_server():
     except Exception as e:
         print(f"❌ Ошибка подключения к tool серверу: {e}")
         return False
-
 
 def main():
     """Запуск всех тестов"""
@@ -154,7 +149,6 @@ def main():
         print("⚠️  Некоторые тесты не прошли.")
 
     return passed == total
-
 
 if __name__ == "__main__":
     success = main()

@@ -113,7 +113,6 @@ WEAK_TRIGGERS = {
     "ux": {"ux", "ui", "mobile", "responsive"},
 }
 
-
 def calculate_confidence(matched_triggers: Dict[str, List[str]]) -> Tuple[float, Dict[str, Any]]:
     """
     Рассчитать confidence (0-1) на основе силы триггеров.
@@ -176,7 +175,6 @@ def calculate_confidence(matched_triggers: Dict[str, List[str]]) -> Tuple[float,
     }
 
     return confidence, breakdown
-
 
 def route_agents(query: str) -> Dict[str, Any]:
     """

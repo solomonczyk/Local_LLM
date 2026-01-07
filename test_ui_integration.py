@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 from agent_runtime.orchestrator.consilium import get_consilium, route_agents
 from agent_runtime.orchestrator.agent import get_llm_circuit_breaker
 
-
 def test_system_status():
     """Тест статуса системы"""
     print("=== Testing System Status ===")
@@ -36,7 +35,6 @@ def test_system_status():
         print(f"✗ Error: {e}")
         return False
 
-
 def test_routing():
     """Тест роутинга"""
     print("\n=== Testing Routing ===")
@@ -60,7 +58,6 @@ def test_routing():
     except Exception as e:
         print(f"✗ Routing error: {e}")
         return False
-
 
 def test_simple_consultation():
     """Тест простой консультации"""
@@ -96,7 +93,6 @@ def test_simple_consultation():
         print(f"✗ Consultation error: {e}")
         return False
 
-
 def main():
     """Запуск всех тестов"""
     print("🤖 Agent System UI Integration Test")
@@ -131,7 +127,6 @@ def main():
         print("⚠️  Some tests failed. Check the errors above.")
 
     return passed == total
-
 
 if __name__ == "__main__":
     success = main()

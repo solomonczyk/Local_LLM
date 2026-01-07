@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from typing import List, Set, Tuple
 
-
 class SecurityConfig:
     """Политики безопасности для tool execution"""
 
@@ -98,7 +97,6 @@ class SecurityConfig:
             return False, f"Command not in allowlist: {base_cmd}"
 
         return True, "OK"
-
 
 class AgentConfig:
     """Конфигурация агентов"""

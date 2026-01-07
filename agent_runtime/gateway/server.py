@@ -16,7 +16,6 @@ LLM_BASE = os.getenv("LLM_BASE", "http://localhost:8000")
 
 app = FastAPI(title="Agent Gateway", version="0.1")
 
-
 @app.get("/health")
 def health():
     tool = requests.get(f"{TOOL_BASE}/health", timeout=5).json()
@@ -28,13 +27,11 @@ def health():
         llm_ok = False
     return {"status": "ok", "tool": tool, "llm_reachable": llm_ok}
 
-
 class ChatRequest(BaseModel):
     model: str
     messages: list
     max_tokens: int = 512
     temperature: float = 0.2
-
 
 @app.post("/v1/chat/completions")
 def chat(req: ChatRequest):
@@ -87,7 +84,6 @@ Team Opinions:
             }
         ],
     }
-
 
 if __name__ == "__main__":
     import uvicorn

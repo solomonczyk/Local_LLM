@@ -4,7 +4,6 @@
 """
 import requests
 
-
 def test_memory_system_availability():
     """Проверка доступности системы памяти"""
     print("=== Testing Memory System Availability ===")
@@ -25,7 +24,6 @@ def test_memory_system_availability():
     else:
         print(f"❌ Ошибка получения статуса: {response.status_code}")
         return False
-
 
 def test_memory_imports():
     """Тест импорта модулей памяти"""
@@ -66,7 +64,6 @@ def test_memory_imports():
         print(f"❌ Ошибка импорта: {e}")
         return False
 
-
 def test_memory_schema_design():
     """Тест дизайна схемы памяти"""
     print("\n=== Testing Memory Schema Design ===")
@@ -105,7 +102,6 @@ def test_memory_schema_design():
         print("❌ PostgreSQL память недоступна для тестирования")
         return False
 
-
 def test_conversation_manager_integration():
     """Тест интеграции с conversation manager"""
     print("\n=== Testing Conversation Manager Integration ===")
@@ -140,7 +136,6 @@ def test_conversation_manager_integration():
         print(f"❌ Ошибка интеграции: {e}")
         return False
 
-
 def test_enhanced_server_memory_integration():
     """Тест интеграции enhanced сервера с памятью"""
     print("\n=== Testing Enhanced Server Memory Integration ===")
@@ -163,7 +158,6 @@ def test_enhanced_server_memory_integration():
     else:
         print(f"❌ Enhanced сервер недоступен: {response.status_code}")
         return False
-
 
 def main():
     """Запуск всех тестов архитектуры памяти"""
@@ -209,7 +203,6 @@ def main():
         print("\n❌ ТРЕБУЕТСЯ ДОРАБОТКА архитектуры памяти")
 
     return success_rate >= 60
-
 
 if __name__ == "__main__":
     success = main()

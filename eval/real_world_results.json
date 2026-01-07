@@ -1,0 +1,157 @@
+{
+  "summary": {
+    "total_score": 30,
+    "max_score": 60,
+    "percentage": 50.0,
+    "syntax_valid": 1,
+    "total_tasks": 10,
+    "avg_time": 36.3752956867218,
+    "domains": {
+      "dev": {
+        "count": 3,
+        "score": 8,
+        "max_score": 18
+      },
+      "architect": {
+        "count": 3,
+        "score": 7,
+        "max_score": 18
+      },
+      "security": {
+        "count": 2,
+        "score": 9,
+        "max_score": 12
+      },
+      "qa": {
+        "count": 2,
+        "score": 6,
+        "max_score": 12
+      }
+    }
+  },
+  "results": [
+    {
+      "task_id": "agent_health_check",
+      "domain": "dev",
+      "generated_code": "agent = get_agent(agent_name)\n    if not agent:\n        return {'healthy': False, 'response_time': 0.0, 'error': f'Agent {agent_name} not found'}\n\n    try:\n        response = requests.get(agent.url, timeout=timeout)\n        response.raise_for_status()\n        response_time = response.elapsed.total_seconds()\n        return {'healthy': True, 'response_time': response_time, 'error': ''}\n    except requests.exceptions.RequestException as e:\n        return {'healthy': False, 'response_time': 0.0, 'error': str(e)}",
+      "full_code": "def check_agent_health(agent_name: str, timeout: float = 5.0) -> dict:\n    \"\"\"Check if agent is responding and healthy\n    Returns: {'healthy': bool, 'response_time': float, 'error': str}\n    \"\"\"\nagent = get_agent(agent_name)\n    if not agent:\n        return {'healthy': False, 'response_time': 0.0, 'error': f'Agent {agent_name} not found'}\n\n    try:\n        response = requests.get(agent.url, timeout=timeout)\n        response.raise_for_status()\n        response_time = response.elapsed.total_seconds()\n        return {'healthy': True, 'response_time': response_time, 'error': ''}\n    except requests.exceptions.RequestException as e:\n        return {'healthy': False, 'response_time': 0.0, 'error': str(e)}",
+      "generation_time": 29.050966501235962,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected indent (<unknown>, line 6)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    },
+    {
+      "task_id": "circuit_breaker_pattern",
+      "domain": "architect",
+      "generated_code": "self.failure_threshold = failure_threshold\n        self.timeout = timeout\n        self.failure_count = 0\n        self.last_failure = 0\n        self.last_success = 0\n        self.open = False\n\n    def is_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is open\"\"\"\n        return self.open\n\n    def is_closed(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is closed\"\"\"\n        return not self.open\n\n    def is_half_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is half open\"\"\"\n        return self.open and self.failure_count == 0\n\n    def is_open_or_half_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is open or half open\"\"\"\n        return self.open or self.is_half_open()\n\n    def is_closed_or_half_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is closed or half open\"\"\"\n        return self.is_closed() or self",
+      "full_code": "class CircuitBreaker:\n    def __init__(self, failure_threshold: int = 5, timeout: int = 60):\n        \"\"\"Circuit breaker for API calls\n        - Opens after failure_threshold failures\n        - Stays open for timeout seconds\n        \"\"\"\nself.failure_threshold = failure_threshold\n        self.timeout = timeout\n        self.failure_count = 0\n        self.last_failure = 0\n        self.last_success = 0\n        self.open = False\n\n    def is_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is open\"\"\"\n        return self.open\n\n    def is_closed(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is closed\"\"\"\n        return not self.open\n\n    def is_half_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is half open\"\"\"\n        return self.open and self.failure_count == 0\n\n    def is_open_or_half_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is open or half open\"\"\"\n        return self.open or self.is_half_open()\n\n    def is_closed_or_half_open(self) -> bool:\n        \"\"\"Returns True if the circuit breaker is closed or half open\"\"\"\n        return self.is_closed() or self",
+      "generation_time": 48.87699842453003,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected indent (<unknown>, line 8)",
+      "quality_issues": [
+        "Missing state management"
+      ],
+      "score": 1,
+      "max_score": 6
+    },
+    {
+      "task_id": "sql_injection_validator",
+      "domain": "security",
+      "generated_code": "# noqa: E501\n    if not query:\n        return False\n    query = query.strip()\n    if query.startswith(\"--\"):\n        return False\n    if query.startswith(\"/*\"):\n        return False\n    if query.endswith(\"--\"):\n        return False\n    if query.endswith(\"/*\"):\n        return False\n    if query.lower().startswith(\"drop\"):\n        return False\n    if query.lower().startswith(\"delete\"):\n        return False\n    if \"union\" in query.lower():\n        return False\n    return True",
+      "full_code": "def validate_sql_query(query: str) -> bool:\n    \"\"\"Validate SQL query for injection attacks\n    Block: DROP, DELETE without WHERE, UNION, --, /*\n    \"\"\"\n# noqa: E501\n    if not query:\n        return False\n    query = query.strip()\n    if query.startswith(\"--\"):\n        return False\n    if query.startswith(\"/*\"):\n        return False\n    if query.endswith(\"--\"):\n        return False\n    if query.endswith(\"/*\"):\n        return False\n    if query.lower().startswith(\"drop\"):\n        return False\n    if query.lower().startswith(\"delete\"):\n        return False\n    if \"union\" in query.lower():\n        return False\n    return True",
+      "generation_time": 27.041000366210938,
+      "syntax_valid": true,
+      "syntax_message": "Valid syntax",
+      "quality_issues": [],
+      "score": 6,
+      "max_score": 6
+    },
+    {
+      "task_id": "rate_limiter_decorator",
+      "domain": "dev",
+      "generated_code": "def decorator(func):\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            # Calculate the time since the last request\n            time_since_last_request = time.time() - last_request_time\n            # Calculate the number of requests that can be made in the last minute\n            requests_in_last_minute = int(time_since_last_request * requests_per_minute)\n            # If the number of requests in the last minute is less than the limit, allow the request\n            if requests_in_last_minute < requests_per_minute:\n                last_request_time = time.time()\n                return func(*args, **kwargs)\n            # If the number of requests in the last minute is equal to or greater than the limit, return a 429 Too Many Requests response\n            else:\n                return make_response(jsonify({\"error\": \"Too many requests\"}), 429)\n        return wrapper\n    return decorator\n```\n\nIn this solution, we define a `rate_limit",
+      "full_code": "@rate_limit(requests_per_minute=60)\ndef api_endpoint():\n    pass\n\n# Implement the rate_limit decorator\ndef rate_limit(requests_per_minute: int):\ndef decorator(func):\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            # Calculate the time since the last request\n            time_since_last_request = time.time() - last_request_time\n            # Calculate the number of requests that can be made in the last minute\n            requests_in_last_minute = int(time_since_last_request * requests_per_minute)\n            # If the number of requests in the last minute is less than the limit, allow the request\n            if requests_in_last_minute < requests_per_minute:\n                last_request_time = time.time()\n                return func(*args, **kwargs)\n            # If the number of requests in the last minute is equal to or greater than the limit, return a 429 Too Many Requests response\n            else:\n                return make_response(jsonify({\"error\": \"Too many requests\"}), 429)\n        return wrapper\n    return decorator\n```\n\nIn this solution, we define a `rate_limit",
+      "generation_time": 50.760002851486206,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: expected an indented block (<unknown>, line 7)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    },
+    {
+      "task_id": "async_task_queue",
+      "domain": "architect",
+      "generated_code": "self.max_workers = max_workers\n        self.queue = asyncio.Queue()\n        self._workers = []\n        self._shutdown = False\n\n    def add_task(self, task: Callable, *args, **kwargs) -> None:\n        \"\"\"Add task to the queue\"\"\"\n        self.queue.put_nowait((task, args, kwargs))\n\n    def start_workers(self) -> None:\n        \"\"\"Start worker tasks\"\"\"\n        for _ in range(self.max_workers):\n            self._workers.append(asyncio.create_task(self._worker()))\n\n    async def _worker(self) -> None:\n        \"\"\"Worker task to process tasks from the queue\"\"\"\n        while not self._shutdown:\n            task, args, kwargs = await self.queue.get()\n            try:\n                await task(*args, **kwargs)\n            except Exception as e:\n                print(f\"Error in task: {e}\")\n            finally:\n                self.queue.task_done()\n\n    def shutdown(self) -> None:\n        \"\"\"Shutdown the queue and wait for",
+      "full_code": "import asyncio\nfrom typing import Callable, Any\n\nclass AsyncTaskQueue:\n    def __init__(self, max_workers: int = 5):\n        \"\"\"Queue for async task execution with worker limit\"\"\"\nself.max_workers = max_workers\n        self.queue = asyncio.Queue()\n        self._workers = []\n        self._shutdown = False\n\n    def add_task(self, task: Callable, *args, **kwargs) -> None:\n        \"\"\"Add task to the queue\"\"\"\n        self.queue.put_nowait((task, args, kwargs))\n\n    def start_workers(self) -> None:\n        \"\"\"Start worker tasks\"\"\"\n        for _ in range(self.max_workers):\n            self._workers.append(asyncio.create_task(self._worker()))\n\n    async def _worker(self) -> None:\n        \"\"\"Worker task to process tasks from the queue\"\"\"\n        while not self._shutdown:\n            task, args, kwargs = await self.queue.get()\n            try:\n                await task(*args, **kwargs)\n            except Exception as e:\n                print(f\"Error in task: {e}\")\n            finally:\n                self.queue.task_done()\n\n    def shutdown(self) -> None:\n        \"\"\"Shutdown the queue and wait for",
+      "generation_time": 66.66726517677307,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected indent (<unknown>, line 8)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    },
+    {
+      "task_id": "log_sanitizer",
+      "domain": "security",
+      "generated_code": "message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'api_key=.*?(?=\\s|$)', 'api_key=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\",
+      "full_code": "def sanitize_log_message(message: str) -> str:\n    \"\"\"Remove sensitive data from log messages\n    Remove: passwords, API keys, emails, phone numbers\n    \"\"\"\nmessage = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'api_key=.*?(?=\\s|$)', 'api_key=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\s|$)', 'password=***', message)\n    message = re.sub(r'password=.*?(?=\\",
+      "generation_time": 49.186421155929565,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected indent (<unknown>, line 6)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    },
+    {
+      "task_id": "config_validator",
+      "domain": "dev",
+      "generated_code": "api_key: str\n    timeout: int\n    max_retries: int",
+      "full_code": "from pydantic import BaseModel\n\nclass AgentConfig(BaseModel):\n    \"\"\"Configuration for agent system with validation\n    - api_key: required, min 32 chars\n    - timeout: 1-300 seconds\n    - max_retries: 0-10\n    \"\"\"\napi_key: str\n    timeout: int\n    max_retries: int",
+      "generation_time": 4.85055136680603,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected indent (<unknown>, line 10)",
+      "quality_issues": [],
+      "score": 2,
+      "max_score": 6
+    },
+    {
+      "task_id": "memory_leak_detector",
+      "domain": "qa",
+      "generated_code": "# Get the current memory usage\n    current_memory_usage = psutil.Process().memory_info().rss / (1024 * 1024)\n    # Get the total memory usage\n    total_memory_usage = psutil.virtual_memory().total / (1024 * 1024)\n    # Get the current memory usage in MB\n    current_memory_usage_mb = current_memory_usage / (1024 * 1024)\n    # Get the total memory usage in MB\n    total_memory_usage_mb = total_memory_usage / (1024 * 1024)\n    # Get the current memory usage in GB\n    current_memory_usage_gb = current_memory_usage / (1024 * 1024 * 1024)\n    # Get the total memory usage in GB\n    total_memory_usage_gb = total_memory_usage / (1024 * 1024",
+      "full_code": "import psutil\nimport gc\n\ndef detect_memory_leak(threshold_mb: int = 100) -> dict:\n    \"\"\"Detect potential memory leaks in the application\n    Returns leak info and suggestions\n    \"\"\"\n# Get the current memory usage\n    current_memory_usage = psutil.Process().memory_info().rss / (1024 * 1024)\n    # Get the total memory usage\n    total_memory_usage = psutil.virtual_memory().total / (1024 * 1024)\n    # Get the current memory usage in MB\n    current_memory_usage_mb = current_memory_usage / (1024 * 1024)\n    # Get the total memory usage in MB\n    total_memory_usage_mb = total_memory_usage / (1024 * 1024)\n    # Get the current memory usage in GB\n    current_memory_usage_gb = current_memory_usage / (1024 * 1024 * 1024)\n    # Get the total memory usage in GB\n    total_memory_usage_gb = total_memory_usage / (1024 * 1024",
+      "generation_time": 48.77909827232361,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected EOF while parsing (<unknown>, line 19)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    },
+    {
+      "task_id": "api_response_cache",
+      "domain": "architect",
+      "generated_code": "def decorator(func):\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            cache_key = f\"{func.__name__}{args}{kwargs}\"\n            if cache_key in cache:\n                return cache[cache_key]\n            else:\n                result = func(*args, **kwargs)\n                cache[cache_key] = result\n                return result\n        return wrapper\n    return decorator",
+      "full_code": "from functools import wraps\nimport time\n\ndef cache_response(ttl_seconds: int = 300):\n    \"\"\"Cache API responses with TTL\n    Decorator for caching function results\n    \"\"\"\ndef decorator(func):\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            cache_key = f\"{func.__name__}{args}{kwargs}\"\n            if cache_key in cache:\n                return cache[cache_key]\n            else:\n                result = func(*args, **kwargs)\n                cache[cache_key] = result\n                return result\n        return wrapper\n    return decorator",
+      "generation_time": 20.110652923583984,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unindent does not match any outer indentation level (<unknown>, line 19)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    },
+    {
+      "task_id": "test_data_generator",
+      "domain": "qa",
+      "generated_code": "agents = []\n    for i in range(count):\n        agent = {\n            \"id\": f\"agent_{i}\",\n            \"name\": f\"Agent {i}\",\n            \"role\": f\"Role {i}\",\n            \"capabilities\": [f\"Capability {i}\"],\n            \"status\": f\"Status {i}\",\n        }\n        agents.append(agent)\n    return agents",
+      "full_code": "def generate_test_agent_data(count: int = 100) -> list[dict]:\n    \"\"\"Generate realistic test data for agent system\n    Each agent: id, name, role, capabilities, status\n    \"\"\"\nagents = []\n    for i in range(count):\n        agent = {\n            \"id\": f\"agent_{i}\",\n            \"name\": f\"Agent {i}\",\n            \"role\": f\"Role {i}\",\n            \"capabilities\": [f\"Capability {i}\"],\n            \"status\": f\"Status {i}\",\n        }\n        agents.append(agent)\n    return agents",
+      "generation_time": 18.429999828338623,
+      "syntax_valid": false,
+      "syntax_message": "Syntax error: unexpected indent (<unknown>, line 6)",
+      "quality_issues": [],
+      "score": 3,
+      "max_score": 6
+    }
+  ],
+  "timestamp": "2026-01-07 13:04:18"
+}

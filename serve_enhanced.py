@@ -13,7 +13,6 @@ import requests
 import json
 import uuid
 import sys
-import os
 import asyncio
 from typing import Optional
 
@@ -24,9 +23,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 from rate_limiter import rate_limit_middleware
 
 # Конфигурация безопасности
-API_KEY = os.getenv("AGENT_API_KEY", "ea91c0c520c7eb4a9f4064421cae7ca8d120703b9890f35001ecfaa1645cf091")
+API_KEY = os.getenv("AGENT_API_KEY")
+if not API_KEY:
+    raise ValueError("AGENT_API_KEY environment variable is required")
 security = HTTPBearer()
-
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Проверка API ключа"""
@@ -37,7 +37,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)
             headers={"WWW-Authenticate": "Bearer"},
         )
     return credentials.credentials
-
 
 try:
     from agent_system.conversation import conversation_manager
@@ -69,20 +68,17 @@ app.add_middleware(
 # URL tool сервера
 TOOL_SERVER_URL = "http://localhost:8001"
 
-
 class ChatRequest(BaseModel):
     model: str
     messages: list
     temperature: float = 0.7
     max_tokens: int = 512
 
-
 class CompletionRequest(BaseModel):
     model: str
     prompt: str
     temperature: float = 0.7
     max_tokens: int = 512
-
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest, api_key: str = Depends(verify_api_key)):
@@ -119,7 +115,6 @@ async def chat_completions(request: ChatRequest, api_key: str = Depends(verify_a
         "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
     }
 
-
 async def generate_contextual_response(session_id: str, user_message: str) -> str:
     """Генерация ответа с учетом контекста и проактивности"""
 
@@ -149,7 +144,6 @@ async def generate_contextual_response(session_id: str, user_message: str) -> st
         main_response += "\n\n---\n💬 *Я запомню наш диалог и смогу ссылаться на предыдущие сообщения. Также я могу работать с файлами, анализировать код и помогать с разработкой.*"
 
     return main_response
-
 
 def generate_smart_response(text: str, context_summary: str = "") -> str:
     """Генерирует умный ответ на основе ключевых слов и контекста"""
@@ -356,7 +350,6 @@ def generate_smart_response(text: str, context_summary: str = "") -> str:
 
 Нужны дополнительные детали по какому-то из этапов?{context_info}"""
 
-
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest, api_key: str = Depends(verify_api_key)):
     await asyncio.sleep(0.5)
@@ -369,11 +362,9 @@ async def completions(request: CompletionRequest, api_key: str = Depends(verify_
         "choices": [{"text": response, "index": 0, "finish_reason": "stop"}],
     }
 
-
 @app.get("/v1/models")
 async def list_models():
     return {"object": "list", "data": [{"id": "enhanced-model", "object": "model", "owned_by": "local"}]}
-
 
 @app.get("/health")
 async def health_check():
@@ -386,11 +377,9 @@ async def health_check():
         "rate_limiting": "enabled",
     }
 
-
 @app.get("/v1/health")
 async def health_check_v1():
     return await health_check()
-
 
 if __name__ == "__main__":
     import argparse

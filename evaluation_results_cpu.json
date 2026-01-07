@@ -1,0 +1,41 @@
+{
+  "model": "Qwen/Qwen2.5-Coder-1.5B",
+  "lora": "lora_qwen2_5_coder_1_5b_python",
+  "device": "cpu",
+  "perplexity": 1.7539073293754062,
+  "results": [
+    {
+      "name": "Function definition",
+      "prompt": "def fibonacci(n):",
+      "generated": "def fibonacci(n):\n    \"\"\"This function returns the nth value of the fibonacci sequence.\"\"\"\n    if n == 0:\n        return 0\n    elif n == 1:\n        return 1\n    else:\n        return fibonacci(n - 1) + fibonacci(n - 2)",
+      "time": 14.615161895751953,
+      "tokens": 57,
+      "tokens_per_sec": 3.900059431881328
+    },
+    {
+      "name": "Class definition",
+      "prompt": "class User:\n    def __init__(self, name):",
+      "generated": "class User:\n    def __init__(self, name):\n        self.name = name\n        self.followers = 0\n        self.following = 0\n\n    def follow(self, user):\n        user.followers += 1\n        self.following += 1\n\n\nuser_1 = User(\"Joel\")\nuser_2 = User(\"Jame\")\n\nuser_1.follow(user_2)\nprint(user_1.followers)\nprint",
+      "time": 19.313279390335083,
+      "tokens": 80,
+      "tokens_per_sec": 4.1422276550317125
+    },
+    {
+      "name": "List comprehension",
+      "prompt": "# Square even numbers\nnumbers = [1,2,3,4,5]\nresult =",
+      "generated": "# Square even numbers\nnumbers = [1,2,3,4,5]\nresult = list(filter(lambda x: x%2 == 0, numbers))\nprint(result)",
+      "time": 4.355541467666626,
+      "tokens": 18,
+      "tokens_per_sec": 4.1326664281864955
+    },
+    {
+      "name": "Error handling",
+      "prompt": "def safe_read(filename):\n    try:",
+      "generated": "def safe_read(filename):\n    try: return open(filename, 'r').read()\n    except: return \"\"",
+      "time": 3.6329023838043213,
+      "tokens": 15,
+      "tokens_per_sec": 4.128930099215114
+    }
+  ],
+  "timestamp": "2026-01-07 12:44:29"
+}

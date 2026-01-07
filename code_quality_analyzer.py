@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple
 from collections import defaultdict, Counter
 
-
 class CodeQualityAnalyzer:
     """Анализатор качества кода"""
 
@@ -496,7 +495,6 @@ class CodeQualityAnalyzer:
             },
         }
 
-
 def main():
     """Основная функция анализа"""
 
@@ -565,7 +563,6 @@ def main():
     print(f"\n💾 Детальный отчет сохранен в: code_quality_report.json")
 
     return report["quality_scores"]["scores"]["overall"] >= 6.0 if "scores" in report["quality_scores"] else False
-
 
 if __name__ == "__main__":
     success = main()

@@ -1,0 +1,68 @@
+{
+  "analysis_date": "2026-01-07",
+  "total_shadow_runs": 14,
+  "unique_tasks": 7,
+  
+  "summary": {
+    "director_calls": 14,
+    "director_skipped": 3,
+    "total_tokens": 5682,
+    "total_cost_usd": 0.00156,
+    "avg_cost_per_call": 0.000111,
+    "avg_tokens_per_call": 406,
+    "avg_director_latency_sec": 2.98
+  },
+  
+  "confidence_analysis": {
+    "consilium_avg_confidence": 0.73,
+    "director_avg_confidence": 0.85,
+    "confidence_uplift": "+16%",
+    "alignment_rate": "71%"
+  },
+  
+  "trigger_analysis": {
+    "hard_triggers_activated": {
+      "security": 6,
+      "migration": 2,
+      "payment": 2,
+      "architecture": 4
+    },
+    "soft_triggers_activated": {
+      "low_confidence": 5,
+      "multi_domain": 4
+    },
+    "skipped_tasks": [
+      "UI fixes (no security/arch triggers)",
+      "Testing suite (qa/dev only)",
+      "SEO optimization (no critical triggers)"
+    ]
+  },
+  
+  "quality_comparison": {
+    "director_provides_risks": true,
+    "avg_risks_per_response": 2,
+    "avg_recommendations_per_response": 3,
+    "director_response_more_detailed": true,
+    "security_alignment": "71% (5/7 tasks)"
+  },
+  
+  "economic_projection": {
+    "calls_per_day_estimate": 20,
+    "daily_cost_estimate_usd": 0.00222,
+    "monthly_cost_estimate_usd": 0.067,
+    "within_budget": true,
+    "budget_target_usd": "1-5/day",
+    "note": "Actual cost much lower than budget - excellent ROI"
+  },
+  
+  "recommendations": {
+    "ready_for_active_mode": true,
+    "confidence_threshold": 0.7,
+    "suggested_improvements": [
+      "Add disagreement detector between agents",
+      "Implement summary quality scoring",
+      "Add CRITICAL_LIGHT mode for summary-only"
+    ],
+    "next_step": "Enable active mode with monitoring"
+  }
+}

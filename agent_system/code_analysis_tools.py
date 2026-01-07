@@ -7,7 +7,6 @@ from typing import Any, Dict
 from .audit import audit_logger
 from .config import SecurityConfig
 
-
 class CodeAnalysisTools:
     """Инструменты для анализа кода"""
 

@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 from .agent import Agent
 from .consilium import get_consilium
 
-
 class Orchestrator:
     """Оркестратор для управления агентами и выполнения задач"""
 
@@ -173,10 +172,8 @@ class Orchestrator:
             "consilium": self.consilium.get_status(),
         }
 
-
 # Lazy singleton для orchestrator
 _orchestrator_instance: Optional[Orchestrator] = None
-
 
 def get_orchestrator() -> Orchestrator:
     """Получить singleton экземпляр оркестратора"""
@@ -184,7 +181,6 @@ def get_orchestrator() -> Orchestrator:
     if _orchestrator_instance is None:
         _orchestrator_instance = Orchestrator()
     return _orchestrator_instance
-
 
 # Для обратной совместимости
 orchestrator = None

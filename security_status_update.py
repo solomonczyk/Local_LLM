@@ -9,12 +9,14 @@ import requests
 import time
 from datetime import datetime
 
-
 def check_api_authentication():
     """Проверяет работу API аутентификации"""
     print("🔑 Checking API authentication...")
 
-    api_key = os.getenv("AGENT_API_KEY", "ea91c0c520c7eb4a9f4064421cae7ca8d120703b9890f35001ecfaa1645cf091")
+    api_key = os.getenv("AGENT_API_KEY")
+    if not api_key:
+        print("❌ AGENT_API_KEY environment variable not set")
+        return False
 
     # Тест LLM API
     try:
@@ -68,12 +70,14 @@ def check_api_authentication():
     except Exception as e:
         print(f"  ❌ Tools API: Connection error - {e}")
 
-
 def check_rate_limiting():
     """Проверяет работу rate limiting"""
     print("\n⏱️ Checking rate limiting...")
 
-    api_key = os.getenv("AGENT_API_KEY", "ea91c0c520c7eb4a9f4064421cae7ca8d120703b9890f35001ecfaa1645cf091")
+    api_key = os.getenv("AGENT_API_KEY")
+    if not api_key:
+        print("❌ AGENT_API_KEY environment variable not set")
+        return False
 
     # Быстрые запросы для проверки rate limiting
     success_count = 0
@@ -98,13 +102,11 @@ def check_rate_limiting():
     else:
         print("  ❌ Rate limiting: Too restrictive or not working")
 
-
 def check_https_config():
     """Проверяет HTTPS конфигурацию"""
     print("\n🔒 Checking HTTPS configuration...")
 
     # Проверяем наличие SSL сертификатов
-    import os
 
     if os.path.exists("ssl/agent.crt") and os.path.exists("ssl/agent.key"):
         print("  ✅ SSL certificates: Found")
@@ -126,7 +128,6 @@ def check_https_config():
                 print("  ✅ Docker ports: Configured for alternative ports")
             else:
                 print("  ❌ Docker ports: Not configured properly")
-
 
 def check_security_headers():
     """Проверяет security headers"""
@@ -150,7 +151,6 @@ def check_security_headers():
 
     except Exception as e:
         print(f"  ❌ Cannot check headers: {e}")
-
 
 def generate_security_report():
     """Генерирует отчет о безопасности"""
@@ -189,7 +189,6 @@ def generate_security_report():
 
     print("  ✅ Security report saved to security_report.json")
 
-
 def main():
     print("🔒 Agent System Security Status Check")
     print("=" * 50)
@@ -212,8 +211,11 @@ def main():
     print("  2. Restart with HTTPS: docker-compose up -d")
     print("  3. Test all endpoints with authentication")
 
-    print(f"\n🔑 API Key: ea91c0c520c7eb4a9f4064421cae7ca8d120703b9890f35001ecfaa1645cf091")
-
+    api_key = os.getenv("AGENT_API_KEY")
+    if api_key:
+        print(f"\n🔑 API Key: {api_key[:8]}...{api_key[-8:]} (masked for security)")
+    else:
+        print("\n❌ API Key: Not set in environment variables")
 
 if __name__ == "__main__":
     main()

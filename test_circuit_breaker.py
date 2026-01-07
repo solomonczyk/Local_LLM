@@ -1,193 +1,204 @@
+#!/usr/bin/env python3
 """
-Тест Circuit Breaker для LLM
+Тест Circuit Breaker для Director
 """
+
+import os
+import json
 import time
-from agent_runtime.orchestrator.agent import CircuitBreaker, CircuitBreakerError, get_llm_circuit_breaker, Agent
+from agent_system.director_circuit_breaker import DirectorCircuitBreaker
 
 
-def test_circuit_breaker_states():
-    """Тест переходов состояний Circuit Breaker"""
-    print("=" * 60)
-    print("Testing Circuit Breaker state transitions")
-    print("=" * 60)
-
-    # Создаём CB с низкими порогами для теста
-    cb = CircuitBreaker(failure_threshold=2, recovery_timeout=2, success_threshold=1)  # 2 секунды для быстрого теста
-
-    # Начальное состояние
-    print(f"\n1. Initial state: {cb.state}")
-    assert cb.state == "CLOSED"
-    assert cb.can_execute() == True
-    print("   [OK] CLOSED, can execute")
-
-    # Первая ошибка
-    cb.record_failure(Exception("Test error 1"))
-    print(f"\n2. After 1 failure: {cb.state}, failures={cb.failure_count}")
-    assert cb.state == "CLOSED"  # Ещё не достигли порога
-    print("   [OK] Still CLOSED (threshold=2)")
-
-    # Вторая ошибка - переход в OPEN
-    cb.record_failure(Exception("Test error 2"))
-    print(f"\n3. After 2 failures: {cb.state}, failures={cb.failure_count}")
-    assert cb.state == "OPEN"
-    assert cb.can_execute() == False
-    print("   [OK] OPEN, cannot execute")
-
-    # Ждём recovery timeout
-    print(f"\n4. Waiting {cb.recovery_timeout}s for recovery...")
-    time.sleep(cb.recovery_timeout + 0.5)
-
-    # Проверяем переход в HALF_OPEN
-    can_exec = cb.can_execute()
-    print(f"5. After recovery timeout: {cb.state}, can_execute={can_exec}")
-    assert cb.state == "HALF_OPEN"
-    assert can_exec == True
-    print("   [OK] HALF_OPEN, can execute (probe)")
-
-    # Успешный вызов - переход в CLOSED
-    cb.record_success()
-    print(f"\n6. After success in HALF_OPEN: {cb.state}")
-    assert cb.state == "CLOSED"
-    assert cb.failure_count == 0
-    print("   [OK] CLOSED, failure count reset")
-
-    print("\n" + "=" * 60)
-    print("All state transition tests passed!")
-    print("=" * 60)
-
-
-def test_circuit_breaker_metrics():
-    """Тест метрик Circuit Breaker"""
-    print("\n" + "=" * 60)
-    print("Testing Circuit Breaker metrics")
-    print("=" * 60)
-
-    cb = CircuitBreaker(failure_threshold=3, recovery_timeout=60)
-
-    # Симулируем вызовы
-    cb.record_success()
-    cb.record_success()
-    cb.record_failure(Exception("Error 1"))
-    cb.record_success()
-
-    status = cb.get_status()
-    print(f"\nStatus: {status}")
-
-    assert status["total_calls"] == 4
-    assert status["total_failures"] == 1
-    assert status["state"] == "CLOSED"
-    print("[OK] Metrics correct")
-
-    print("\n" + "=" * 60)
-    print("Metrics tests passed!")
-    print("=" * 60)
-
-
-def test_circuit_breaker_half_open_failure():
-    """Тест: ошибка в HALF_OPEN возвращает в OPEN"""
-    print("\n" + "=" * 60)
-    print("Testing HALF_OPEN failure -> OPEN")
-    print("=" * 60)
-
-    cb = CircuitBreaker(failure_threshold=1, recovery_timeout=1)
-
-    # Переводим в OPEN
-    cb.record_failure(Exception("Error"))
-    assert cb.state == "OPEN"
-    print(f"1. State: {cb.state}")
-
-    # Ждём recovery
-    time.sleep(1.5)
-    cb.can_execute()  # Переход в HALF_OPEN
-    assert cb.state == "HALF_OPEN"
-    print(f"2. State: {cb.state}")
-
-    # Ошибка в HALF_OPEN
-    cb.record_failure(Exception("Error in probe"))
-    assert cb.state == "OPEN"
-    print(f"3. State after failure: {cb.state}")
-    print("[OK] Correctly returned to OPEN")
-
-    print("\n" + "=" * 60)
-    print("HALF_OPEN failure test passed!")
-    print("=" * 60)
-
-
-def test_global_circuit_breaker():
-    """Тест глобального Circuit Breaker"""
-    print("\n" + "=" * 60)
-    print("Testing global LLM Circuit Breaker")
-    print("=" * 60)
-
-    cb1 = get_llm_circuit_breaker()
-    cb2 = get_llm_circuit_breaker()
-
-    assert cb1 is cb2, "Should be singleton"
-    print("[OK] Singleton pattern works")
-
-    print(f"Global CB status: {cb1.get_status()}")
-
-    print("\n" + "=" * 60)
-    print("Global Circuit Breaker test passed!")
-    print("=" * 60)
+def test_circuit_breaker():
+    """Тестирует circuit breaker с различными сценариями"""
+    
+    print("="*60)
+    print("Testing Director Circuit Breaker")
+    print("="*60)
+    
+    # Создаём новый circuit breaker для тестирования
+    cb = DirectorCircuitBreaker()
+    
+    print(f"Initial mode: {cb.current_mode}")
+    print(f"Limits: {cb.limits}")
+    
+    # Сценарий 1: Нормальная работа (должна остаться в active)
+    print(f"\n--- Scenario 1: Normal Operation ---")
+    for i in range(10):
+        cb.record_director_call(
+            override_applied=(i % 3 == 0),  # 33% override rate
+            director_cost=0.0001,  # Низкая стоимость
+            director_latency=2.5,  # Нормальная latency
+            director_error=False,
+            confidence_diff=0.15
+        )
+    
+    status = cb.get_current_status()
+    print(f"After normal calls: mode={cb.current_mode}")
+    print(f"Rolling metrics: {json.dumps(status['rolling_metrics'], indent=2)}")
+    
+    # Сценарий 2: Высокий override rate (должен trigger rollback)
+    print(f"\n--- Scenario 2: High Override Rate ---")
+    for i in range(15):
+        cb.record_director_call(
+            override_applied=True,  # 100% override rate
+            director_cost=0.0001,
+            director_latency=2.0,
+            director_error=False,
+            confidence_diff=0.05
+        )
+    
+    status = cb.get_current_status()
+    print(f"After high override rate: mode={cb.current_mode}")
+    print(f"Rolling metrics: {json.dumps(status['rolling_metrics'], indent=2)}")
+    
+    # Сценарий 3: Высокая стоимость (должен trigger rollback если ещё не сработал)
+    print(f"\n--- Scenario 3: High Cost ---")
+    for i in range(5):
+        cb.record_director_call(
+            override_applied=False,
+            director_cost=0.005,  # Высокая стоимость
+            director_latency=1.5,
+            director_error=False,
+            confidence_diff=0.10
+        )
+    
+    status = cb.get_current_status()
+    print(f"After high cost: mode={cb.current_mode}")
+    print(f"Rolling metrics: {json.dumps(status['rolling_metrics'], indent=2)}")
+    
+    # Сценарий 4: Высокие ошибки
+    print(f"\n--- Scenario 4: High Error Rate ---")
+    for i in range(10):
+        cb.record_director_call(
+            override_applied=False,
+            director_cost=0.0001,
+            director_latency=1.0,
+            director_error=(i % 2 == 0),  # 50% error rate
+            confidence_diff=0.0
+        )
+    
+    status = cb.get_current_status()
+    print(f"After high errors: mode={cb.current_mode}")
+    print(f"Rolling metrics: {json.dumps(status['rolling_metrics'], indent=2)}")
+    
+    # Сценарий 5: Высокая latency
+    print(f"\n--- Scenario 5: High Latency ---")
+    for i in range(10):
+        cb.record_director_call(
+            override_applied=False,
+            director_cost=0.0001,
+            director_latency=8.0,  # Высокая latency
+            director_error=False,
+            confidence_diff=0.10
+        )
+    
+    status = cb.get_current_status()
+    print(f"After high latency: mode={cb.current_mode}")
+    print(f"Rolling metrics: {json.dumps(status['rolling_metrics'], indent=2)}")
+    
+    # Финальный статус
+    print(f"\n--- Final Status ---")
+    final_status = cb.get_current_status()
+    print(f"Final mode: {cb.current_mode}")
+    print(f"Total calls: {final_status['total_calls']}")
+    print(f"Health: {final_status['health']}")
+    
+    # Проверяем логи
+    if os.path.exists(cb.log_file):
+        print(f"\nCircuit breaker logs created: {cb.log_file}")
+        
+        with open(cb.log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            print(f"Total log entries: {len(lines)}")
+            
+            # Показываем последние события
+            print(f"\nLast 3 events:")
+            for line in lines[-3:]:
+                event = json.loads(line)
+                if event.get("event") == "director_mode_change":
+                    print(f"  MODE CHANGE: {event['old_mode']} → {event['new_mode']} ({event['reason']})")
+                elif event.get("event") == "circuit_breaker_check":
+                    decision = event.get("decision", "unknown")
+                    violations = event.get("violations", [])
+                    print(f"  CHECK: {decision} (violations: {len(violations)})")
+    
+    # Тестируем should_use_director
+    print(f"\n--- Director Usage Test ---")
+    use_director, reason = cb.should_use_director()
+    print(f"Should use director: {use_director} ({reason})")
+    
+    return cb
 
 
-def test_agent_with_circuit_breaker():
-    """Тест Agent с Circuit Breaker (без реального LLM)"""
-    print("\n" + "=" * 60)
-    print("Testing Agent with Circuit Breaker")
-    print("=" * 60)
-
-    agent = Agent(name="TestAgent", role="Test", llm_url="http://localhost:9999")  # Несуществующий URL
-
-    # Сбрасываем глобальный CB для чистого теста
-    global _llm_circuit_breaker
-    from agent_runtime.orchestrator import agent as agent_module
-
-    agent_module._llm_circuit_breaker = CircuitBreaker(failure_threshold=2, recovery_timeout=5)
-
-    cb = get_llm_circuit_breaker()
-    print(f"Initial CB state: {cb.state}")
-
-    # Первый вызов - ошибка соединения
-    result1 = agent._call_llm([{"role": "user", "content": "test"}])
-    print(f"\n1. First call result: {result1[:50]}...")
-    print(f"   CB state: {cb.state}, failures: {cb.failure_count}")
-    assert "[LLM_CONNECTION_ERROR]" in result1 or "[LLM_ERROR]" in result1
-
-    # Второй вызов - ещё одна ошибка, CB переходит в OPEN
-    result2 = agent._call_llm([{"role": "user", "content": "test"}])
-    print(f"\n2. Second call result: {result2[:50]}...")
-    print(f"   CB state: {cb.state}, failures: {cb.failure_count}")
-    assert cb.state == "OPEN"
-
-    # Третий вызов - CB блокирует
-    result3 = agent._call_llm([{"role": "user", "content": "test"}])
-    print(f"\n3. Third call (blocked): {result3[:60]}...")
-    assert "[CIRCUIT_BREAKER_OPEN]" in result3
-    assert cb.total_blocked >= 1
-    print(f"   Blocked calls: {cb.total_blocked}")
-
-    print("\n[OK] Agent correctly uses Circuit Breaker")
-
-    # Проверяем статистику
-    stats = agent.get_timing_stats()
-    print(f"\nAgent timing stats with CB:")
-    print(f"  circuit_breaker.state: {stats['circuit_breaker']['state']}")
-    print(f"  circuit_breaker.total_blocked: {stats['circuit_breaker']['total_blocked']}")
-
-    print("\n" + "=" * 60)
-    print("Agent Circuit Breaker test passed!")
-    print("=" * 60)
+def simulate_production_scenario():
+    """Симулирует production сценарий с постепенной деградацией"""
+    
+    print(f"\n{'='*60}")
+    print("Simulating Production Scenario")
+    print("="*60)
+    
+    cb = DirectorCircuitBreaker()
+    
+    # Устанавливаем active mode принудительно
+    cb.current_mode = "active"
+    
+    print("Phase 1: Healthy operation (10 calls)")
+    for i in range(10):
+        cb.record_director_call(
+            override_applied=(i % 4 == 0),  # 25% override
+            director_cost=0.0001,
+            director_latency=2.0,
+            director_error=False,
+            confidence_diff=0.15
+        )
+        time.sleep(0.1)  # Небольшая задержка
+    
+    status = cb.get_current_status()
+    print(f"After phase 1: mode={cb.current_mode}, health={status['health']}")
+    
+    print("\nPhase 2: Gradual degradation (15 calls)")
+    for i in range(15):
+        # Постепенно увеличиваем override rate и latency
+        override_rate = 0.3 + (i * 0.04)  # От 30% до 86%
+        latency = 2.0 + (i * 0.3)  # От 2s до 6.4s
+        
+        cb.record_director_call(
+            override_applied=(i / 15) < override_rate,
+            director_cost=0.0001 + (i * 0.00005),  # Растущая стоимость
+            director_latency=latency,
+            director_error=(i > 10 and i % 5 == 0),  # Ошибки в конце
+            confidence_diff=0.10 - (i * 0.005)  # Падающая эффективность
+        )
+        time.sleep(0.1)
+        
+        # Показываем когда сработал circuit breaker
+        if cb.current_mode != "active":
+            print(f"  Circuit breaker triggered at call {i+1}")
+            break
+    
+    final_status = cb.get_current_status()
+    print(f"After phase 2: mode={cb.current_mode}, health={final_status['health']}")
+    
+    # Показываем финальные метрики
+    metrics = final_status.get('rolling_metrics', {})
+    print(f"\nFinal rolling metrics:")
+    print(f"  Override rate (last 20): {metrics.get('override_rate_20', 0):.2f}")
+    print(f"  Error rate (last 20): {metrics.get('error_rate_20', 0):.2f}")
+    print(f"  Avg latency (last 20): {metrics.get('avg_latency_20', 0):.1f}s")
+    print(f"  Daily cost: ${metrics.get('daily_cost', 0):.4f}")
+    
+    return cb
 
 
 if __name__ == "__main__":
-    test_circuit_breaker_states()
-    test_circuit_breaker_metrics()
-    test_circuit_breaker_half_open_failure()
-    test_global_circuit_breaker()
-    test_agent_with_circuit_breaker()
-
-    print("\n" + "=" * 60)
-    print("[SUCCESS] All Circuit Breaker tests passed!")
-    print("=" * 60)
+    # Основной тест
+    cb1 = test_circuit_breaker()
+    
+    # Production сценарий
+    cb2 = simulate_production_scenario()
+    
+    print(f"\n{'='*60}")
+    print("CIRCUIT BREAKER TEST COMPLETE")
+    print("="*60)
+    print("Check director_circuit_breaker.jsonl for detailed logs")

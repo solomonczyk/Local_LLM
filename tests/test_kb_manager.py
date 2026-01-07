@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 from agent_runtime.orchestrator.kb_manager import KnowledgeBaseManager
 
-
 class TestKnowledgeBaseManager(unittest.TestCase):
     """Test cases for KnowledgeBaseManager"""
 
@@ -194,7 +193,6 @@ This is implementation details.
         finally:
             # Restore original cache
             self.kb_manager.kb_cache = original_cache
-
 
 if __name__ == "__main__":
     unittest.main()

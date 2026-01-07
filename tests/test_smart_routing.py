@@ -11,7 +11,6 @@ from agent_runtime.orchestrator.smart_routing import (
     route_agents,
 )
 
-
 class TestSmartRouting(unittest.TestCase):
     """Test cases for Smart Routing"""
 
@@ -144,7 +143,6 @@ class TestSmartRouting(unittest.TestCase):
                 if domain in breakdown:
                     self.assertIn("score", breakdown[domain])
                     self.assertIn("reason", breakdown[domain])
-
 
 if __name__ == "__main__":
     unittest.main()

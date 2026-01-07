@@ -5,7 +5,6 @@
 import requests
 import time
 
-
 def test_agent_query(query: str, expected_keywords: list = None) -> bool:
     """Тест запроса к агенту"""
     print(f"\n🤖 Запрос: {query}")
@@ -33,7 +32,6 @@ def test_agent_query(query: str, expected_keywords: list = None) -> bool:
     else:
         print(f"❌ Ошибка запроса: {response.status_code}")
         return False
-
 
 def main():
     """Демонстрация всех возможностей"""
@@ -116,7 +114,6 @@ def main():
         print("🔧 Многие функции не работают как ожидается")
 
     return success_rate >= 80
-
 
 if __name__ == "__main__":
     success = main()

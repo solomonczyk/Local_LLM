@@ -5,7 +5,6 @@ import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-
 class KnowledgeBaseManager:
     """
     Управление Knowledge Base для агентов консилиума.
@@ -146,7 +145,6 @@ class KnowledgeBaseManager:
     def _is_ballast_section(self, section_title: str) -> bool:
         """Проверить является ли секция балластной"""
         # Нормализуем: убираем номера, скобки, приводим к lowercase
-        import re
 
         normalized = re.sub(r"^[\d\)\.\-\s]+", "", section_title)  # убираем "0) ", "1. " и т.д.
         normalized = normalized.lower().split("(")[0].strip()

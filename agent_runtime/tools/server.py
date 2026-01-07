@@ -9,7 +9,6 @@ WORKSPACE_ROOT = Path(os.getenv("AGENT_WORKSPACE", Path.cwd())).resolve()
 
 app = FastAPI(title="Agent Tool Server", version="0.1")
 
-
 @app.get("/health")
 def health():
     return {
@@ -17,10 +16,8 @@ def health():
         "workspace": str(WORKSPACE_ROOT),
     }
 
-
 class ReadFileRequest(BaseModel):
     path: str
-
 
 @app.post("/tools/read_file")
 def read_file(req: ReadFileRequest):
@@ -37,11 +34,9 @@ def read_file(req: ReadFileRequest):
         "content": target.read_text(encoding="utf-8", errors="ignore"),
     }
 
-
 class WriteFileRequest(BaseModel):
     path: str
     patch: str  # unified diff
-
 
 @app.post("/tools/write_file_patch")
 def write_file_patch(req: WriteFileRequest):
@@ -69,10 +64,8 @@ def write_file_patch(req: WriteFileRequest):
         "path": req.path,
     }
 
-
 class ListDirRequest(BaseModel):
     path: str = "."
-
 
 @app.post("/tools/list_dir")
 def list_dir(req: ListDirRequest):
@@ -91,7 +84,6 @@ def list_dir(req: ListDirRequest):
     # sort: dirs first then files
     items.sort(key=lambda x: (x["type"] != "dir", x["name"].lower()))
     return {"path": req.path, "items": items}
-
 
 if __name__ == "__main__":
     import uvicorn

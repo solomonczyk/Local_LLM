@@ -4,7 +4,6 @@
 from agent_runtime.orchestrator.agent import Agent
 from agent_runtime.orchestrator.consilium import get_consilium
 
-
 def test_agent_health_check():
     """Тест health check в Agent"""
     print("=" * 60)
@@ -40,7 +39,6 @@ def test_agent_health_check():
     print("Agent health check tests passed!")
     print("=" * 60)
 
-
 def test_consilium_health_check():
     """Тест health check в Consilium"""
     print("\n" + "=" * 60)
@@ -58,7 +56,6 @@ def test_consilium_health_check():
     print("\n" + "=" * 60)
     print("Consilium health check tests passed!")
     print("=" * 60)
-
 
 def test_consult_with_health_check():
     """Тест consult() с health check"""
@@ -88,7 +85,6 @@ def test_consult_with_health_check():
     print("Consult health check tests passed!")
     print("=" * 60)
 
-
 def test_consult_skip_health_check():
     """Тест consult() без health check"""
     print("\n" + "=" * 60)
@@ -111,7 +107,6 @@ def test_consult_skip_health_check():
     print("\n" + "=" * 60)
     print("Skip health check tests passed!")
     print("=" * 60)
-
 
 if __name__ == "__main__":
     test_agent_health_check()

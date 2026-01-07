@@ -6,7 +6,6 @@ import requests
 import time
 import uuid
 
-
 def test_memory_status():
     """Проверка статуса системы памяти"""
     print("=== Testing Memory Status ===")
@@ -24,7 +23,6 @@ def test_memory_status():
         print(f"❌ Ошибка получения статуса: {response.status_code}")
         return False
 
-
 def test_memory_initialization():
     """Тест инициализации схемы памяти"""
     print("\n=== Testing Memory Initialization ===")
@@ -38,7 +36,6 @@ def test_memory_initialization():
     else:
         print(f"❌ Ошибка инициализации: {response.status_code} - {response.text}")
         return False
-
 
 def test_conversation_with_postgres_memory():
     """Тест диалога с PostgreSQL памятью"""
@@ -105,7 +102,6 @@ def test_conversation_with_postgres_memory():
         print(f"❌ Ошибка первого сообщения: {response1.status_code}")
         return False
 
-
 def test_memory_search():
     """Тест поиска в памяти"""
     print("\n=== Testing Memory Search ===")
@@ -164,7 +160,6 @@ def test_memory_search():
         print(f"❌ Не удалось импортировать conversation manager: {e}")
         return False
 
-
 def test_postgres_memory_features():
     """Тест специфичных возможностей PostgreSQL памяти"""
     print("\n=== Testing PostgreSQL Memory Features ===")
@@ -219,7 +214,6 @@ def test_postgres_memory_features():
         print(f"❌ PostgreSQL память недоступна: {e}")
         return False
 
-
 def main():
     """Запуск всех тестов PostgreSQL памяти"""
     print("🧠 PostgreSQL Memory Test")
@@ -265,7 +259,6 @@ def main():
         print("\n❌ ТРЕБУЕТСЯ ДОРАБОТКА PostgreSQL памяти")
 
     return success_rate >= 60
-
 
 if __name__ == "__main__":
     success = main()

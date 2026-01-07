@@ -23,20 +23,17 @@ app = FastAPI()
 # URL tool сервера
 TOOL_SERVER_URL = "http://localhost:8001"
 
-
 class ChatRequest(BaseModel):
     model: str
     messages: list
     temperature: float = 0.7
     max_tokens: int = 512
 
-
 class CompletionRequest(BaseModel):
     model: str
     prompt: str
     temperature: float = 0.7
     max_tokens: int = 512
-
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
@@ -60,7 +57,6 @@ async def chat_completions(request: ChatRequest):
         "choices": [{"index": 0, "message": {"role": "assistant", "content": response}, "finish_reason": "stop"}],
     }
 
-
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest):
     await asyncio.sleep(0.5)
@@ -73,23 +69,19 @@ async def completions(request: CompletionRequest):
         "choices": [{"text": response, "index": 0, "finish_reason": "stop"}],
     }
 
-
 @app.get("/v1/models")
 async def list_models():
     return {"object": "list", "data": [{"id": "mock-model", "object": "model", "owned_by": "local"}]}
-
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint для проверки доступности сервера"""
     return {"status": "healthy", "model_loaded": True, "model_name": "mock-model"}
 
-
 @app.get("/v1/health")
 async def health_check_v1():
     """Health check endpoint (OpenAI-style path)"""
     return await health_check()
-
 
 def generate_mock_response(text: str) -> str:
     """Генерирует mock ответ на основе ключевых слов"""
@@ -238,7 +230,6 @@ print("Hello World")'
 Или: 'напиши в файл config.json следующее: {"debug": true}'"""
 
     elif any(word in text_lower for word in ["удали файл", "delete file", "remove file"]):
-        import re
 
         file_patterns = [
             r'["\']([^"\']+\.[a-zA-Z0-9]+)["\']',
@@ -390,7 +381,6 @@ print("Hello World")'
 5. **Документация** - описать API и процессы
 
 Нужны дополнительные детали по какому-то из этапов?"""
-
 
 if __name__ == "__main__":
     import asyncio

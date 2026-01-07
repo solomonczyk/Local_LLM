@@ -1,0 +1,17 @@
+{
+  "test_date": "2026-01-07T15:27:37.919924",
+  "test_type": "decision_capsule_validation",
+  "total_tasks": 20,
+  "director_calls": 12,
+  "overrides_applied": 7,
+  "override_rate": 0.5833333333333334,
+  "avg_tokens_per_call": 390.0,
+  "avg_cost_per_call": 0.000112,
+  "total_cost": 0.001339,
+  "avg_latency": 2.8,
+  "improvement": {
+    "tokens_before": 3114,
+    "tokens_after": 390.0,
+    "reduction_pct": 87.5
+  }
+}

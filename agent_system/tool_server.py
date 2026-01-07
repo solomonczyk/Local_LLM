@@ -30,9 +30,10 @@ except ImportError:
     MEMORY_POSTGRES_AVAILABLE = False
 
 # Конфигурация безопасности
-API_KEY = os.getenv("AGENT_API_KEY", "ea91c0c520c7eb4a9f4064421cae7ca8d120703b9890f35001ecfaa1645cf091")
+API_KEY = os.getenv("AGENT_API_KEY")
+if not API_KEY:
+    raise ValueError("AGENT_API_KEY environment variable is required")
 security = HTTPBearer()
-
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Проверка API ключа"""
@@ -43,7 +44,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)
             headers={"WWW-Authenticate": "Bearer"},
         )
     return credentials.credentials
-
 
 app = FastAPI(title="Agent Tool Server", version="1.0.0")
 
@@ -66,62 +66,49 @@ app.add_middleware(
 # Глобальный executor
 tool_executor = ToolExecutor(agent_name="api")
 
-
 class ReadFileRequest(BaseModel):
     path: str
-
 
 class WriteFileRequest(BaseModel):
     path: str
     content: str
     mode: str = "overwrite"
 
-
 class ListDirRequest(BaseModel):
     path: str = "."
     pattern: str = "*"
-
 
 class SearchRequest(BaseModel):
     query: str
     globs: Optional[List[str]] = None
 
-
 class GitRequest(BaseModel):
     cmd: str
-
 
 class ShellRequest(BaseModel):
     command: str
 
-
 class SystemInfoRequest(BaseModel):
     info_type: str = "disks"
-
 
 class NetworkInfoRequest(BaseModel):
     pass
 
-
 class DeleteFileRequest(BaseModel):
     path: str
-
 
 class EditFileRequest(BaseModel):
     path: str
     old_text: str
     new_text: str
 
-
 class CopyFileRequest(BaseModel):
     source_path: str
     dest_path: str
 
-
 class MoveFileRequest(BaseModel):
     source_path: str
     dest_path: str
-
 
 class DatabaseConnectionRequest(BaseModel):
     name: str
@@ -131,27 +118,22 @@ class DatabaseConnectionRequest(BaseModel):
     password: str
     port: int = 5432
 
-
 class DatabaseQueryRequest(BaseModel):
     connection_name: str
     query: str
     params: Optional[List] = None
 
-
 class DatabaseSchemaRequest(BaseModel):
     connection_name: str
     table_name: Optional[str] = None
 
-
 class MemoryInitRequest(BaseModel):
     connection_name: str = "agent_memory"
-
 
 class MemorySearchRequest(BaseModel):
     session_id: str
     query: str
     limit: int = 20
-
 
 @app.get("/")
 async def root():
@@ -161,7 +143,6 @@ async def root():
         "workspace": str(SecurityConfig.WORKSPACE_ROOT),
         "access_level": AgentConfig.CURRENT_ACCESS_LEVEL,
     }
-
 
 @app.get("/health")
 async def health_check():
@@ -177,7 +158,6 @@ async def health_check():
         "rate_limiting": "enabled",
     }
 
-
 @app.post("/tools/read_file")
 async def read_file(request: ReadFileRequest, api_key: str = Depends(verify_api_key)):
     """Чтение файла"""
@@ -185,7 +165,6 @@ async def read_file(request: ReadFileRequest, api_key: str = Depends(verify_api_
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/write_file")
 async def write_file(request: WriteFileRequest, api_key: str = Depends(verify_api_key)):
@@ -195,7 +174,6 @@ async def write_file(request: WriteFileRequest, api_key: str = Depends(verify_ap
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/list_dir")
 async def list_dir(request: ListDirRequest):
     """Список файлов"""
@@ -203,7 +181,6 @@ async def list_dir(request: ListDirRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/search")
 async def search(request: SearchRequest):
@@ -213,7 +190,6 @@ async def search(request: SearchRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/git")
 async def git(request: GitRequest):
     """Git команды"""
@@ -221,7 +197,6 @@ async def git(request: GitRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/shell")
 async def shell(request: ShellRequest, api_key: str = Depends(verify_api_key)):
@@ -231,7 +206,6 @@ async def shell(request: ShellRequest, api_key: str = Depends(verify_api_key)):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/system_info")
 async def system_info(request: SystemInfoRequest):
     """Системная информация"""
@@ -239,7 +213,6 @@ async def system_info(request: SystemInfoRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/network_info")
 async def network_info(request: NetworkInfoRequest):
@@ -249,7 +222,6 @@ async def network_info(request: NetworkInfoRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/delete_file")
 async def delete_file(request: DeleteFileRequest):
     """Удаление файла"""
@@ -257,7 +229,6 @@ async def delete_file(request: DeleteFileRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/edit_file")
 async def edit_file(request: EditFileRequest):
@@ -267,7 +238,6 @@ async def edit_file(request: EditFileRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/copy_file")
 async def copy_file(request: CopyFileRequest):
     """Копирование файла"""
@@ -276,7 +246,6 @@ async def copy_file(request: CopyFileRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/move_file")
 async def move_file(request: MoveFileRequest):
     """Перемещение/переименование файла"""
@@ -284,7 +253,6 @@ async def move_file(request: MoveFileRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/db_add_connection")
 async def db_add_connection(request: DatabaseConnectionRequest):
@@ -301,7 +269,6 @@ async def db_add_connection(request: DatabaseConnectionRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/db_execute_query")
 async def db_execute_query(request: DatabaseQueryRequest):
     """Выполнить SQL запрос"""
@@ -310,7 +277,6 @@ async def db_execute_query(request: DatabaseQueryRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/db_get_schema")
 async def db_get_schema(request: DatabaseSchemaRequest):
     """Получить схему БД"""
@@ -318,7 +284,6 @@ async def db_get_schema(request: DatabaseSchemaRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.post("/tools/memory_init")
 async def memory_init(request: MemoryInitRequest):
@@ -334,7 +299,6 @@ async def memory_init(request: MemoryInitRequest):
         raise HTTPException(status_code=400, detail=result["error"])
     return result
 
-
 @app.post("/tools/memory_search")
 async def memory_search(request: MemorySearchRequest):
     """Поиск в памяти агента"""
@@ -345,7 +309,6 @@ async def memory_search(request: MemorySearchRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
-
 
 @app.get("/tools/memory_status")
 async def memory_status():
@@ -361,12 +324,10 @@ async def memory_status():
         },
     }
 
-
 @app.get("/audit/recent")
 async def get_recent_audit(limit: int = 100):
     """Получить последние действия из audit log"""
     return {"actions": audit_logger.get_recent_actions(limit)}
-
 
 @app.get("/config")
 async def get_config():
@@ -379,7 +340,6 @@ async def get_config():
         "allowed_commands": list(SecurityConfig.ALLOWED_SHELL_COMMANDS),
         "safe_git_commands": list(SecurityConfig.SAFE_GIT_COMMANDS),
     }
-
 
 if __name__ == "__main__":
     import argparse

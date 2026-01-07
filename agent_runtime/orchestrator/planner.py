@@ -4,7 +4,6 @@ import requests
 
 TOOL_BASE = "http://localhost:8001"
 
-
 def run_planner(messages: list) -> list:
     """
     Very simple planner:

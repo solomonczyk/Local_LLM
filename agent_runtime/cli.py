@@ -11,7 +11,6 @@ from .orchestrator import get_orchestrator
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-
 def main():
     logger.info("Agent System CLI")
     logger.info("=" * 50)
@@ -107,7 +106,6 @@ def main():
 
     else:
         logger.error(f"Unknown command: {command}")
-
 
 if __name__ == "__main__":
     main()

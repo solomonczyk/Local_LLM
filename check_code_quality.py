@@ -6,7 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 def run_command(cmd, description):
     """Выполнить команду и показать результат"""
     print(f"\n🔧 {description}")
@@ -30,7 +29,6 @@ def run_command(cmd, description):
     except Exception as e:
         print(f"❌ Ошибка выполнения: {e}")
         return False
-
 
 def main():
     """Основная функция проверки качества кода"""
@@ -72,7 +70,6 @@ def main():
     else:
         print("⚠️ Некоторые проверки не прошли. Проверьте вывод выше.")
         return False
-
 
 if __name__ == "__main__":
     success = main()

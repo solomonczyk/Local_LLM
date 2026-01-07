@@ -7,12 +7,10 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-
 class CircuitBreakerError(Exception):
     """Исключение когда Circuit Breaker открыт"""
 
     pass
-
 
 class CircuitBreaker:
     """
@@ -130,10 +128,8 @@ class CircuitBreaker:
             "recent_state_changes": self.state_changes[-3:],  # последние 3
         }
 
-
 # Глобальный Circuit Breaker для LLM (shared между всеми агентами)
 _llm_circuit_breaker: Optional[CircuitBreaker] = None
-
 
 def get_llm_circuit_breaker() -> CircuitBreaker:
     """Получить singleton Circuit Breaker для LLM"""
@@ -142,34 +138,26 @@ def get_llm_circuit_breaker() -> CircuitBreaker:
         _llm_circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60, success_threshold=1)
     return _llm_circuit_breaker
 
-
 class Agent:
     """Базовый агент для работы с LLM и tools"""
 
     # Размер окна для скользящего среднего
     TIMING_WINDOW = 20
 
-    def __init__(
-        self, name: str, role: str, llm_url: str = "http://localhost:8000/v1", tool_url: str = "http://localhost:8001"
-    ):
+    def __init__(self, name: str = "Agent", role: str = "Generic Agent", 
+                 llm_url: str = "http://localhost:8000/v1", 
+                 tool_url: str = "http://localhost:8001"):
+        """Инициализация агента"""
         self.name = name
         self.role = role
         self.llm_url = llm_url
         self.tool_url = tool_url
-        self.conversation_history: List[Dict[str, str]] = []
-        self.repo_snapshot = None
-
-        # Timing metrics (скользящее окно)
-        self._llm_times: deque = deque(maxlen=self.TIMING_WINDOW)
-        self._retrieval_times: deque = deque(maxlen=self.TIMING_WINDOW)
+        
+        # Метрики
+        self._llm_times = deque(maxlen=self.TIMING_WINDOW)
         self._llm_call_count = 0
-        self._retrieval_call_count = 0
-
-        # Retry configuration
+        self._retry_count = 0
         self._max_retries = 3
-        self._retry_base_delay = 1.0  # секунды
-        self._retry_max_delay = 10.0  # максимальная задержка
-        self._retry_count = 0  # счётчик retry для метрик
 
     def _call_llm_once(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
         """Один вызов LLM без retry (внутренний метод)"""
@@ -429,7 +417,6 @@ class Agent:
         - Inject repo snapshot if available
         - Only do 2-pass if READ_FILE is really needed
         """
-        import re
 
         system = (
             "You are an autonomous software agent.\n"
