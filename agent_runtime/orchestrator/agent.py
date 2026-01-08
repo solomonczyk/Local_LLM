@@ -146,13 +146,20 @@ class Agent:
     TIMING_WINDOW = 20
 
     def __init__(self, name: str = "Agent", role: str = "Generic Agent", 
-                 llm_url: str = "http://localhost:8010/v1", 
-                 tool_url: str = "http://localhost:8011"):
-        """Инициализация агента"""
+                 llm_url: str = None, 
+                 tool_url: str = None):
+        """Инициализация агента
+        
+        Hybrid Architecture:
+        - Agents use AGENT_LLM_URL (local Qwen via ngrok)
+        - Director uses DIRECTOR_LLM_URL (GPT-5.2 via OpenAI)
+        """
+        import os
         self.name = name
         self.role = role
-        self.llm_url = llm_url
-        self.tool_url = tool_url
+        # Use env var or fallback to default
+        self.llm_url = llm_url or os.getenv("AGENT_LLM_URL", "http://localhost:8010/v1")
+        self.tool_url = tool_url or os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
         
         # Метрики LLM
         self._llm_times = deque(maxlen=self.TIMING_WINDOW)
@@ -172,9 +179,12 @@ class Agent:
 
     def _call_llm_once(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
         """Один вызов LLM без retry (внутренний метод)"""
+        # Add ngrok header to bypass browser warning for free tier
+        headers = {"ngrok-skip-browser-warning": "true"}
         response = requests.post(
             f"{self.llm_url}/chat/completions",
             json={"model": "qwen2.5-coder-lora", "messages": messages, "max_tokens": max_tokens, "temperature": 0.7},
+            headers=headers,
             timeout=180,
         )
         response.raise_for_status()
@@ -291,9 +301,11 @@ class Agent:
             }
         """
         start = time.perf_counter()
+        # Add ngrok header to bypass browser warning for free tier
+        headers = {"ngrok-skip-browser-warning": "true"}
         try:
             # Пробуем /health endpoint
-            response = requests.get(f"{self.llm_url.rstrip('/v1')}/health", timeout=timeout)
+            response = requests.get(f"{self.llm_url.rstrip('/v1')}/health", headers=headers, timeout=timeout)
             elapsed_ms = (time.perf_counter() - start) * 1000
 
             if response.status_code == 200:
