@@ -300,35 +300,21 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
 
 if __name__ == "__main__":
     import argparse
-    import socket
-
-    def find_free_port(start_port=7861):
-        for port in range(start_port, start_port + 100):
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.bind(("0.0.0.0", port))
-                    return port
-            except OSError:
-                continue
-        return start_port
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Agent System UI")
-    parser.add_argument("--server_port", type=int, default=None, help="Port to run the server on")
+    parser.add_argument("--server_port", type=int, default=7864, help="Port to run the server on")
     parser.add_argument("--server_name", type=str, default="0.0.0.0", help="Server name/IP to bind to")
     args = parser.parse_args()
 
-    # Determine port
-    if args.server_port:
-        port = args.server_port
-    else:
-        port = find_free_port()
+    port = args.server_port
+    host = args.server_name
 
     print("Starting Agent System UI...")
-    print(f"Server will be available at http://{args.server_name}:{port}")
+    print(f"Server will be available at http://{host}:{port}")
 
     try:
-        demo.launch(server_name=args.server_name, server_port=port, share=False, show_error=True)
+        demo.launch(server_name=host, server_port=port, share=False, show_error=True)
     except Exception as e:
         print(f"Failed to start UI server: {e}")
         import traceback
