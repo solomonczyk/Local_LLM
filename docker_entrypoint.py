@@ -196,7 +196,7 @@ def main():
     # Запускаем сервисы
     services_to_start = [
         {"name": "tool_server", "command": ["python", "-m", "agent_system.tool_server", "--port", "8011"], "delay": 0},
-        {"name": "llm_server", "command": ["python", "serve_enhanced.py", "--port", "8010"], "delay": 3},
+        {"name": "llm_server", "command": ["python", (os.getenv("LLM_SERVER_IMPL") or "serve_enhanced.py"), "--port", "8010"], "delay": 3},
         {
             "name": "ui_server",
             "command": ["python", "ui.py", "--server_port", "7864", "--server_name", "0.0.0.0"],

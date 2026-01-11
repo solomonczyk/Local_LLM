@@ -20,6 +20,7 @@ from agent_system.director_adapter import DirectorAdapter, DirectorRequest, Risk
 # Глобальные переменные для контекста
 additional_context = ""
 uploaded_files_content = {}
+pending_action = None
 
 def get_system_status():
     """Получить статус системы"""
@@ -57,6 +58,10 @@ def get_system_status():
 
 def preview_routing(task: str):
     """Предпросмотр роутинга без вызова LLM"""
+    global pending_action
+
+    global pending_action
+
     if not task.strip():
         return "Enter a task to preview routing"
 
@@ -84,10 +89,22 @@ def preview_routing(task: str):
     except Exception as e:
         return f"Error: {e}"
 
-def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, include_context: bool):
+def run_task(
+    task: str,
+    mode: str,
+    use_smart_routing: bool,
+    check_health: bool,
+    include_context: bool,
+    use_tools: bool,
+):
     """Выполнить задачу"""
     if not task.strip():
-        return "Please enter a task"
+        yield "Please enter a task", summarize_pending_action(pending_action)
+        return
+
+    if pending_action:
+        yield "Pending action awaiting approval. Approve or clear it first.", summarize_pending_action(pending_action)
+        return
 
     # Добавляем контекст если нужно
     full_task = task
@@ -111,6 +128,7 @@ def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, 
             f"Smart Routing: {use_smart_routing}",
             f"Health Check: {check_health}",
             f"Context included: {include_context}",
+            f"Tools enabled: {use_tools}",
             "",
             f"Task: {task[:200]}{'...' if len(task) > 200 else ''}",
             "",
@@ -118,14 +136,19 @@ def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, 
             "",
         ]
 
-        yield "\n".join(output_lines)
+        pending_text = summarize_pending_action(pending_action)
+        yield "\n".join(output_lines), pending_text
 
         # Безопасное выполнение
         try:
-            consilium = get_consilium()
-            result = consilium.consult(full_task, use_smart_routing=use_smart_routing, check_health=check_health)
+            if use_tools:
+                orchestrator = get_orchestrator()
+                result = orchestrator.execute_task(full_task, agent_name="dev", use_consilium=False)
+            else:
+                consilium = get_consilium()
+                result = consilium.consult(full_task, use_smart_routing=use_smart_routing, check_health=check_health)
         except Exception as e:
-            yield f"Error executing task: {e}"
+            yield f"Error executing task: {e}", pending_text
             return
 
         # Форматируем результат
@@ -136,7 +159,30 @@ def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, 
             output_lines.append(f"[ERROR] {result.get('error', 'Unknown error')}")
             if "health_check" in result:
                 output_lines.append(f"Health: {result['health_check']}")
+            yield "\n".join(output_lines), pending_text
+            return
         else:
+            if result.get("requires_confirmation"):
+                pending_action = result.get("pending_action")
+                pending_text = summarize_pending_action(pending_action)
+                output_lines.append("Confirmation required. Review pending actions and click Approve.")
+                yield "\n".join(output_lines), pending_text
+                return
+
+            if use_tools:
+                output_lines.append("=== Response ===")
+                output_lines.append(result.get("response", ""))
+                tool_results = result.get("tool_results", [])
+                if tool_results:
+                    output_lines.append("")
+                    output_lines.append("=== Tool Results (summary) ===")
+                    for item in tool_results:
+                        tool = item.get("tool", "tool")
+                        status = "ok" if item.get("success") else "error"
+                        output_lines.append(f"- {tool}: {status}")
+                yield "\n".join(output_lines), pending_text
+                return
+
             output_lines.append(f"Result Mode: {result.get('mode', 'N/A')}")
             output_lines.append("")
 
@@ -176,10 +222,10 @@ def run_task(task: str, mode: str, use_smart_routing: bool, check_health: bool, 
                 output_lines.append(f"Director: {t.get('director', 0)}s")
                 output_lines.append(f"Total: {t.get('total', 0)}s")
 
-        yield "\n".join(output_lines)
+        yield "\n".join(output_lines), pending_text
 
     except Exception as e:
-        yield f"Error: {e}"
+        yield f"Error: {e}", summarize_pending_action(pending_action)
 
 def update_context(text: str):
     """Обновить дополнительный контекст"""
@@ -217,6 +263,35 @@ def clear_files():
     uploaded_files_content = {}
     return "Files cleared"
 
+def summarize_pending_action(action):
+    if not action:
+        return "No pending actions"
+    tool_calls = action.get("tool_calls", [])
+    tools = ", ".join(call.get("tool", "unknown") for call in tool_calls) or "unknown"
+    return f"Pending confirmation for tools: {tools}"
+
+def approve_pending_action():
+    global pending_action
+    if not pending_action:
+        return "No pending actions to approve", "No pending actions"
+
+    try:
+        orchestrator = get_orchestrator()
+        result = orchestrator.approve_pending_action(pending_action)
+    except Exception as e:
+        return f"Error approving action: {e}", summarize_pending_action(pending_action)
+
+    pending_action = None
+    if not result.get("success"):
+        return f"Error approving action: {result.get('error', 'unknown error')}", "No pending actions"
+
+    return result.get("response", ""), "No pending actions"
+
+def clear_pending_action():
+    global pending_action
+    pending_action = None
+    return "Pending action cleared", "No pending actions"
+
 # Создаём интерфейс
 with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🤖 Agent System UI")
@@ -240,6 +315,12 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
 
             include_context = gr.Checkbox(value=False, label="Include Context", info="Add context and files to task")
 
+            tools_enabled = gr.Checkbox(
+                value=True,
+                label="Tools Enabled",
+                info="Allow the agent to use tools (CRUD, search, system, db)",
+            )
+
             gr.Markdown("### 📊 Status")
             status_btn = gr.Button("Refresh Status", size="sm")
             status_output = gr.Textbox(label="System Status", lines=8, interactive=False)
@@ -260,6 +341,12 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
 
             gr.Markdown("### 📤 Output")
             output = gr.Textbox(label="Result", lines=20, interactive=False)
+
+            gr.Markdown("### Pending Actions")
+            pending_output = gr.Textbox(label="Pending Actions", lines=2, interactive=False, value="No pending actions")
+            with gr.Row():
+                approve_btn = gr.Button("Approve Action", variant="primary")
+                clear_pending_btn = gr.Button("Clear Pending", variant="secondary")
 
         # Правая колонка - контекст и файлы
         with gr.Column(scale=1):
@@ -286,7 +373,9 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
     preview_btn.click(fn=preview_routing, inputs=task_input, outputs=preview_output)
 
     run_btn.click(
-        fn=run_task, inputs=[task_input, mode_select, smart_routing, health_check, include_context], outputs=output
+        fn=run_task,
+        inputs=[task_input, mode_select, smart_routing, health_check, include_context, tools_enabled],
+        outputs=[output, pending_output],
     )
 
     context_btn.click(fn=update_context, inputs=context_input, outputs=context_status)
@@ -294,6 +383,9 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
     file_upload.change(fn=handle_file_upload, inputs=file_upload, outputs=files_status)
 
     clear_btn.click(fn=clear_files, outputs=files_status)
+
+    approve_btn.click(fn=approve_pending_action, outputs=[output, pending_output])
+    clear_pending_btn.click(fn=clear_pending_action, outputs=[output, pending_output])
 
     # Загружаем статус при старте
     demo.load(fn=get_system_status, outputs=status_output)

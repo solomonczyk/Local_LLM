@@ -18,6 +18,7 @@ from .smart_routing import route_agents
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from agent_system.config import AgentConfig
 from agent_system.shadow_director import shadow_director
+from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
 
 class Consilium:
     """Консилиум специализированных агентов"""
@@ -42,6 +43,9 @@ class Consilium:
         self.kb_manager = KnowledgeBaseManager(
             kb_top_k=self.kb_top_k, kb_max_chars=self.kb_max_chars, cache_size=AgentConfig.KB_CACHE_SIZE
         )
+
+        # Director (GPT) adapter for final decision summaries
+        self.director_adapter = DirectorAdapter()
 
         # Инициализируем специализированных агентов
         self.agents: Dict[str, Agent] = {
@@ -89,9 +93,9 @@ class Consilium:
         Проверить доступность LLM сервера перед запуском агентов.
         Использует первого доступного агента для проверки.
         """
-        if self.agents:
-            first_agent = list(self.agents.values())[0]
-            return first_agent.check_llm_health(timeout)
+        for name, agent in self.agents.items():
+            if name != "director":
+                return agent.check_llm_health(timeout)
         return {"healthy": False, "status": "no_agents", "error": "No agents available"}
 
     def consult(self, task: str, use_smart_routing: bool = True, check_health: bool = True) -> Dict[str, Any]:
@@ -193,8 +197,18 @@ class Consilium:
 
         if include_director:
             director_start = time.time()
-            director_prompt = self._build_director_prompt(task, opinions)
-            director_decision = self.agents["director"].think(director_prompt)
+            try:
+                director_request = self._build_director_request(task, opinions, routing_info)
+                director_response = self.director_adapter.call_director(director_request)
+                director_decision = self._format_director_response(director_response)
+            except Exception as e:
+                try:
+                    director_prompt = self._build_director_prompt(task, opinions)
+                    director_decision = self.agents["director"].think(director_prompt)
+                except Exception as fallback_error:
+                    director_decision = (
+                        f"Director unavailable, fallback failed. Error: {e}; Fallback error: {fallback_error}"
+                    )
             director_time = time.time() - director_start
 
         total_time = time.time() - start_time
@@ -305,6 +319,72 @@ Use this knowledge base to inform your analysis."""
             except:
                 return 0.5
         return 0.5
+
+    def _sanitize_summary(self, text: str, limit: int) -> str:
+        """Compact and redact summaries before sending to Director."""
+        if not text:
+            return ""
+        clean = re.sub(r"```[\s\S]*?```", "[code]", text)
+        clean = re.sub(r"`[^`]+`", "[ref]", clean)
+        clean = re.sub(r"[\\/][\\w/\\.-]+\\.[\\w]+", "[file]", clean)
+        clean = re.sub(r"\s+", " ", clean).strip()
+        if len(clean) <= limit:
+            return clean
+        trimmed = clean[:limit]
+        if " " in trimmed:
+            trimmed = trimmed.rsplit(" ", 1)[0]
+        return trimmed + "..."
+
+    def _build_director_request(
+        self, task: str, opinions: Dict[str, Any], routing: Optional[Dict[str, Any]]
+    ) -> DirectorRequest:
+        routing = routing or {}
+        confidence = float(routing.get("confidence", 0.7))
+        domains_count = int(routing.get("domains_matched", len(opinions)))
+
+        task_lower = task.lower()
+        high_risk_keywords = ["auth", "token", "password", "payment", "migration", "vulnerability", "security"]
+        if "security" in opinions or any(kw in task_lower for kw in high_risk_keywords):
+            risk_level = RiskLevel.HIGH
+        elif confidence < 0.7 or domains_count >= 3:
+            risk_level = RiskLevel.MEDIUM
+        else:
+            risk_level = RiskLevel.LOW
+
+        agent_summaries: Dict[str, str] = {}
+        for agent, data in opinions.items():
+            summary = data.get("opinion", "")
+            limit = 200 if agent == "security" else 160
+            agent_summaries[agent] = self._sanitize_summary(summary, limit) or "No summary"
+
+        facts = [
+            f"confidence:{confidence:.2f}",
+            f"domains:{domains_count}",
+            f"agents:{len(opinions)}",
+        ]
+        if routing.get("downgraded"):
+            facts.append("downgraded")
+        if "security" in opinions:
+            facts.append("security review required")
+
+        problem_summary = self._sanitize_summary(task, 300)
+
+        return DirectorRequest(
+            problem_summary=problem_summary,
+            facts=facts[:10],
+            agent_summaries=agent_summaries,
+            risk_level=risk_level,
+            confidence=confidence,
+        )
+
+    def _format_director_response(self, response) -> str:
+        return (
+            f"Decision: {response.decision}\n"
+            f"Risks: {', '.join(response.risks)}\n"
+            f"Recommendations: {', '.join(response.recommendations)}\n"
+            f"Next step: {response.next_step}\n"
+            f"Confidence: {response.confidence:.2f}"
+        )
 
     def _build_director_prompt(self, task: str, opinions: Dict[str, Any]) -> str:
         """Построить промпт для директора"""

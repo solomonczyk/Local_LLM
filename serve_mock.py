@@ -21,7 +21,14 @@ from agent_system.proactive import proactive_agent
 app = FastAPI()
 
 # URL tool сервера
-TOOL_SERVER_URL = "http://localhost:8001"
+TOOL_SERVER_URL = os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
+TOOL_API_KEY = os.getenv("AGENT_API_KEY")
+
+def _tool_headers():
+    headers = {}
+    if TOOL_API_KEY:
+        headers["Authorization"] = f"Bearer {TOOL_API_KEY}"
+    return headers
 
 class ChatRequest(BaseModel):
     model: str
@@ -91,7 +98,12 @@ def generate_mock_response(text: str) -> str:
     if any(word in text_lower for word in ["диск", "disk", "drive", "hdd", "ssd"]):
         try:
             # Пытаемся получить реальную информацию о дисках
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "disks"}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/system_info",
+                json={"info_type": "disks"},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success") and "disks" in data:
@@ -125,7 +137,12 @@ python -m agent_system.tool_server"""
 
     elif any(word in text_lower for word in ["память", "memory", "ram", "оперативн", "сколько памяти"]):
         try:
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "memory"}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/system_info",
+                json={"info_type": "memory"},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -141,7 +158,12 @@ python -m agent_system.tool_server"""
 
     elif any(word in text_lower for word in ["сеть", "network", "ip", "интерфейс"]):
         try:
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/network_info", json={}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/network_info",
+                json={},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -168,7 +190,12 @@ python -m agent_system.tool_server"""
 
     elif any(word in text_lower for word in ["процесс", "process", "задач", "task"]):
         try:
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "processes"}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/system_info",
+                json={"info_type": "processes"},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -206,7 +233,12 @@ python -m agent_system.tool_server"""
 
         if file_path:
             try:
-                response = requests.post(f"{TOOL_SERVER_URL}/tools/read_file", json={"path": file_path}, timeout=5)
+                response = requests.post(
+                    f"{TOOL_SERVER_URL}/tools/read_file",
+                    json={"path": file_path},
+                    headers=_tool_headers(),
+                    timeout=5,
+                )
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
@@ -246,7 +278,12 @@ print("Hello World")'
 
         if file_path:
             try:
-                response = requests.post(f"{TOOL_SERVER_URL}/tools/delete_file", json={"path": file_path}, timeout=5)
+                response = requests.post(
+                    f"{TOOL_SERVER_URL}/tools/delete_file",
+                    json={"path": file_path},
+                    headers=_tool_headers(),
+                    timeout=5,
+                )
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
@@ -260,7 +297,12 @@ print("Hello World")'
 
     elif any(word in text_lower for word in ["список файлов", "list files", "покажи файлы", "что в папке"]):
         try:
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/list_dir", json={"path": ".", "pattern": "*"}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/list_dir",
+                json={"path": ".", "pattern": "*"},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):

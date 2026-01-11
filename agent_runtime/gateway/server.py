@@ -9,10 +9,12 @@ from pydantic import BaseModel
 # Добавляем корневую директорию в путь для импорта
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from agent_runtime.orchestrator.orchestrator import orchestrator
+from agent_runtime.orchestrator.orchestrator import get_orchestrator
 
-TOOL_BASE = os.getenv("TOOL_BASE", "http://localhost:8001")
-LLM_BASE = os.getenv("LLM_BASE", "http://localhost:8000")
+TOOL_BASE = os.getenv("TOOL_BASE", "http://localhost:8011")
+LLM_BASE = os.getenv("LLM_BASE", "http://localhost:8010")
+
+orchestrator = get_orchestrator()
 
 app = FastAPI(title="Agent Gateway", version="0.1")
 

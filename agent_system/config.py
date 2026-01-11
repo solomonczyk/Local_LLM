@@ -109,14 +109,18 @@ class AgentConfig:
     ACCESS_LEVEL_SHELL_EXTENDED = 4
 
     # Текущий уровень (по умолчанию - безопасный)
-    CURRENT_ACCESS_LEVEL = ACCESS_LEVEL_SAFE_WRITE
+    _access_level_env = os.getenv("AGENT_ACCESS_LEVEL", str(ACCESS_LEVEL_SAFE_WRITE))
+    try:
+        CURRENT_ACCESS_LEVEL = max(ACCESS_LEVEL_READ_ONLY, min(ACCESS_LEVEL_SHELL_EXTENDED, int(_access_level_env)))
+    except ValueError:
+        CURRENT_ACCESS_LEVEL = ACCESS_LEVEL_SAFE_WRITE
 
     # LLM endpoints
     LLM_BASE_URL = "http://localhost:8000/v1"
     LLM_MODEL = "qwen2.5-coder-lora"
 
     # Tool server
-    TOOL_SERVER_PORT = 8001
+    TOOL_SERVER_PORT = 8011
 
     # ========== CONSILIUM MODE ==========
     # FAST     → 1 агент (dev или router→dev/security) - быстрый режим

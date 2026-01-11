@@ -26,7 +26,10 @@ services:
 
   # Агентская система
   agent-system:
-    image: agent-system_agent-system:latest
+    build:
+        context: .
+        dockerfile: Dockerfile
+    image: agent-system_agent-system:latest    
     container_name: agent-system
     environment:
       # PostgreSQL подключение
@@ -35,7 +38,10 @@ services:
       POSTGRES_DB: agent_memory
       POSTGRES_USER: agent_user
       POSTGRES_PASSWORD: agent_password
-      
+      LLM_SERVER_IMPL: ${LLM_SERVER_IMPL:-serve_enhanced.py}
+    
+
+
       # Конфигурация агента
       CONSILIUM_MODE: STANDARD
       KB_TOP_K: 5
@@ -43,6 +49,7 @@ services:
       
       # Безопасность
       AGENT_ACCESS_LEVEL: 2
+      AGENT_API_KEY: dev-local-key
       
     ports:
       - "7865:7864"  # UI
@@ -94,3 +101,4 @@ volumes:
 networks:
   agent-network:
     driver: bridge
+

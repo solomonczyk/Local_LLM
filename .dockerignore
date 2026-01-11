@@ -1,87 +1,75 @@
-# Git
+@"
+# ===== DENY BY DEFAULT =====
+**
+
+# ===== ALLOW ONLY WHAT IMAGE NEEDS =====
+!Dockerfile
+!requirements.txt
+!docker_entrypoint.py
+!agent_system/**
+!agent_runtime/**
+!serve_enhanced.py
+!rate_limiter.py
+!ui.py
+!entrypoint.sh
+!scripts/**
+!config/**
+!pyproject.toml
+!setup.py
+
+# ===== GIT =====
 .git
 .gitignore
 
-# Python
-__pycache__
+# ===== PYTHON =====
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-env
-pip-log.txt
-pip-delete-this-directory.txt
-.tox
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
 
-# Virtual environments
+# ===== VENV / ENV =====
 .env
-.venv
-env/
+.venv/
 venv/
 ENV/
-env.bak/
-venv.bak/
 
-# IDEs
+# ===== IDE / OS =====
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Project specific
-*.backup
-*.deleted_backup
-.agent_audit.log
-.agent_conversations/
-.agent_db_config.json
-test_results/
-logs/
+# ===== RUNTIME DATA (NEVER IN IMAGE) =====
 data/
-
-# Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
-
-# Documentation
-*.md
-docs/
-
-# Tests
-test_*.py
-*_test.py
-
-# Temporary files
+logs/
 tmp/
 temp/
-*.tmp
+.agent_conversations/
+.agent_db_configs/
+.agent_audit.log
+test_results/
 
-# Large model files
+# ===== MODELS / DATASETS =====
+models/
+model/
+checkpoints/
+datasets/
+codesearchnet_*/
 *.bin
 *.safetensors
 lora_*/
 *.model
 
-# Datasets
-codesearchnet_*/
+# ===== DOCS / TESTS =====
+docs/
+*.md
+test_*.py
+*_test.py
+"@ | Set-Content .\.dockerignore
+
+
+

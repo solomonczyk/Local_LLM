@@ -1,12 +1,35 @@
 """
 Базовый агент с доступом к LLM и tools
 """
+import json
 import re
 import time
 from collections import deque
 from typing import Any, Dict, List, Optional
 
 import requests
+
+TOOL_SPECS = {
+    "read_file": {"endpoint": "/tools/read_file", "confirm": False},
+    "write_file": {"endpoint": "/tools/write_file", "confirm": True},
+    "edit_file": {"endpoint": "/tools/edit_file", "confirm": True},
+    "delete_file": {"endpoint": "/tools/delete_file", "confirm": True},
+    "copy_file": {"endpoint": "/tools/copy_file", "confirm": True},
+    "move_file": {"endpoint": "/tools/move_file", "confirm": True},
+    "list_dir": {"endpoint": "/tools/list_dir", "confirm": False},
+    "search": {"endpoint": "/tools/search", "confirm": False},
+    "git": {"endpoint": "/tools/git", "confirm": False},
+    "shell": {"endpoint": "/tools/shell", "confirm": True},
+    "system_info": {"endpoint": "/tools/system_info", "confirm": False},
+    "network_info": {"endpoint": "/tools/network_info", "confirm": False},
+    "db_add_connection": {"endpoint": "/tools/db_add_connection", "confirm": True},
+    "db_execute_query": {"endpoint": "/tools/db_execute_query", "confirm": True},
+    "db_get_schema": {"endpoint": "/tools/db_get_schema", "confirm": False},
+    "memory_init": {"endpoint": "/tools/memory_init", "confirm": True},
+    "memory_search": {"endpoint": "/tools/memory_search", "confirm": False},
+}
+
+READ_ONLY_SQL_PREFIXES = ("select", "show", "describe", "explain", "with")
 
 class CircuitBreakerError(Exception):
     """Исключение когда Circuit Breaker открыт"""
@@ -160,6 +183,15 @@ class Agent:
         # Use env var or fallback to default
         self.llm_url = llm_url or os.getenv("AGENT_LLM_URL", "http://localhost:8010/v1")
         self.tool_url = tool_url or os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
+        self.model = os.getenv("AGENT_LLM_MODEL", "qwen2.5-coder-lora")
+        self.llm_api_key = os.getenv("AGENT_LLM_API_KEY") or os.getenv("AGENT_API_KEY")
+        self.tool_api_key = os.getenv("AGENT_API_KEY")
+        self.is_director = "director" in self.name.lower()
+
+        if self.is_director and os.getenv("DIRECTOR_AGENT_USE_LLM", "false").lower() == "true":
+            self.llm_url = os.getenv("DIRECTOR_LLM_URL", self.llm_url)
+            self.model = os.getenv("DIRECTOR_MODEL", self.model)
+            self.llm_api_key = os.getenv("OPENAI_API_KEY", self.llm_api_key)
         
         # Метрики LLM
         self._llm_times = deque(maxlen=self.TIMING_WINDOW)
@@ -180,10 +212,14 @@ class Agent:
     def _call_llm_once(self, messages: List[Dict[str, str]], max_tokens: int = 512) -> str:
         """Один вызов LLM без retry (внутренний метод)"""
         # Add ngrok header to bypass browser warning for free tier
-        headers = {"ngrok-skip-browser-warning": "true"}
+        headers = {}
+        if "ngrok" in self.llm_url:
+            headers["ngrok-skip-browser-warning"] = "true"
+        if self.llm_api_key:
+            headers["Authorization"] = f"Bearer {self.llm_api_key}"
         response = requests.post(
             f"{self.llm_url}/chat/completions",
-            json={"model": "qwen2.5-coder-lora", "messages": messages, "max_tokens": max_tokens, "temperature": 0.7},
+            json={"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": 0.7},
             headers=headers,
             timeout=180,
         )
@@ -301,8 +337,11 @@ class Agent:
             }
         """
         start = time.perf_counter()
-        # Add ngrok header to bypass browser warning for free tier
-        headers = {"ngrok-skip-browser-warning": "true"}
+        headers = {}
+        if "ngrok" in self.llm_url:
+            headers["ngrok-skip-browser-warning"] = "true"
+        if self.llm_api_key:
+            headers["Authorization"] = f"Bearer {self.llm_api_key}"
         try:
             # Пробуем /health endpoint
             response = requests.get(f"{self.llm_url.rstrip('/v1')}/health", headers=headers, timeout=timeout)
@@ -325,10 +364,219 @@ class Agent:
         except Exception as e:
             return {"healthy": False, "status": "error", "error": str(e)[:200]}
 
+    def _tool_headers(self) -> Dict[str, str]:
+        headers: Dict[str, str] = {}
+        if self.tool_api_key:
+            headers["Authorization"] = f"Bearer {self.tool_api_key}"
+        return headers
+
+    def _ensure_repo_snapshot(self) -> None:
+        if self.repo_snapshot is not None:
+            return
+
+        retrieval_start = time.perf_counter()
+        try:
+            r = requests.post(
+                f"{self.tool_url}/tools/list_dir",
+                json={"path": "."},
+                headers=self._tool_headers(),
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            items = data.get("items")
+            if items is None and "files" in data:
+                items = [
+                    {"name": f["name"], "type": "dir" if f.get("is_dir") else "file"}
+                    for f in data["files"]
+                ]
+            if items is None:
+                items = []
+            lines = []
+            for it in items:
+                prefix = "[DIR]" if it["type"] == "dir" else "[FILE]"
+                lines.append(f"{prefix} {it['name']}")
+            self.repo_snapshot = "\n".join(lines)
+        except Exception as e:
+            self.repo_snapshot = f"[ERROR loading repo snapshot: {e}]"
+        finally:
+            elapsed_ms = (time.perf_counter() - retrieval_start) * 1000
+            self._retrieval_times.append(elapsed_ms)
+            self._retrieval_call_count += 1
+
+    def _build_tool_system_prompt(self) -> str:
+        tool_lines = []
+        for name, spec in TOOL_SPECS.items():
+            hint = {
+                "read_file": '{"path": "..."}',
+                "write_file": '{"path": "...", "content": "...", "mode": "overwrite|append"}',
+                "edit_file": '{"path": "...", "old_text": "...", "new_text": "..."}',
+                "delete_file": '{"path": "..."}',
+                "copy_file": '{"source_path": "...", "dest_path": "..."}',
+                "move_file": '{"source_path": "...", "dest_path": "..."}',
+                "list_dir": '{"path": ".", "pattern": "*"}',
+                "search": '{"query": "...", "globs": ["**/*.py"]}',
+                "git": '{"cmd": "status"}',
+                "shell": '{"command": "..."}',
+                "system_info": '{"info_type": "disks|memory|system|processes"}',
+                "network_info": "{}",
+                "db_add_connection": '{"name": "...", "host": "...", "database": "...", "user": "...", "password": "...", "port": 5432}',
+                "db_execute_query": '{"connection_name": "...", "query": "...", "params": []}',
+                "db_get_schema": '{"connection_name": "...", "table_name": "..."}',
+                "memory_init": '{"connection_name": "..."}',
+                "memory_search": '{"session_id": "...", "query": "...", "limit": 20}',
+            }.get(name, "{}")
+            confirm_tag = " (confirm)" if spec.get("confirm") else ""
+            tool_lines.append(f"- {name}{confirm_tag}: {hint}")
+
+        return (
+            "You are a coding agent with access to tools.\n"
+            "When a tool is needed, respond ONLY with TOOL_CALLS JSON.\n"
+            "Format:\n"
+            "TOOL_CALLS: [{\"tool\": \"name\", \"args\": {...}}]\n"
+            "Do not include any other text when issuing tool calls.\n\n"
+            "Available tools:\n" + "\n".join(tool_lines)
+        )
+
+    def _build_tool_messages(self, task: str) -> List[Dict[str, str]]:
+        self._ensure_repo_snapshot()
+        return [
+            {"role": "system", "content": self._build_tool_system_prompt()},
+            {"role": "system", "content": "Repository snapshot:\n" + (self.repo_snapshot or "")},
+            {"role": "user", "content": task},
+        ]
+
+    def _extract_tool_calls(self, text: str) -> List[Dict[str, Any]]:
+        calls: List[Dict[str, Any]] = []
+
+        array_match = re.search(r"TOOL_CALLS:\s*(\[[\s\S]+?\])", text)
+        if array_match:
+            try:
+                parsed = json.loads(array_match.group(1))
+                if isinstance(parsed, list):
+                    calls.extend(parsed)
+            except json.JSONDecodeError:
+                pass
+
+        if not calls:
+            for match in re.finditer(r"TOOL_CALL:\s*({[\s\S]+?})", text):
+                try:
+                    parsed = json.loads(match.group(1))
+                    if isinstance(parsed, dict):
+                        calls.append(parsed)
+                except json.JSONDecodeError:
+                    continue
+
+        cleaned = []
+        for call in calls:
+            if not isinstance(call, dict):
+                continue
+            tool = call.get("tool")
+            args = call.get("args", {})
+            if tool in TOOL_SPECS and isinstance(args, dict):
+                cleaned.append({"tool": tool, "args": args})
+
+        return cleaned[:5]
+
+    def _tool_call_requires_confirmation(self, call: Dict[str, Any]) -> bool:
+        tool = call.get("tool")
+        args = call.get("args", {})
+        if tool not in TOOL_SPECS:
+            return False
+        if not TOOL_SPECS[tool].get("confirm"):
+            return False
+        if tool == "db_execute_query":
+            query = str(args.get("query", "")).strip().lower()
+            return not query.startswith(READ_ONLY_SQL_PREFIXES)
+        return True
+
+    def _execute_tool_calls(self, calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        results = []
+        for call in calls:
+            tool = call.get("tool")
+            args = call.get("args", {})
+            spec = TOOL_SPECS.get(tool)
+            if not spec:
+                results.append({"tool": tool, "success": False, "error": "Unknown tool"})
+                continue
+            try:
+                response = requests.post(
+                    f"{self.tool_url}{spec['endpoint']}",
+                    json=args,
+                    headers=self._tool_headers(),
+                    timeout=30,
+                )
+                data = response.json()
+                results.append({"tool": tool, "success": response.ok, "result": data})
+            except Exception as e:
+                results.append({"tool": tool, "success": False, "error": str(e)})
+        return results
+
+    def _format_tool_results(self, results: List[Dict[str, Any]]) -> str:
+        lines = []
+        for item in results:
+            tool = item.get("tool")
+            payload = item.get("result") or {"error": item.get("error")}
+            payload_text = json.dumps(payload, ensure_ascii=True)[:2000]
+            lines.append(f"{tool}: {payload_text}")
+        return "\n".join(lines)
+
+    def _finalize_with_tool_results(
+        self, messages: List[Dict[str, str]], first_response: str, results: List[Dict[str, Any]]
+    ) -> str:
+        tool_summary = self._format_tool_results(results)
+        messages_pass2 = [
+            *messages,
+            {"role": "assistant", "content": first_response},
+            {"role": "system", "content": "Tool results:\n" + tool_summary},
+            {"role": "user", "content": "Provide the final answer. Do not request more tools."},
+        ]
+        return self._call_llm(messages_pass2)
+
+    def think_with_tools(self, task: str, require_confirmation: bool = True) -> Dict[str, Any]:
+        messages = self._build_tool_messages(task)
+        first = self._call_llm(messages)
+
+        tool_calls = self._extract_tool_calls(first)
+        if not tool_calls:
+            return {"status": "final", "response": first, "tool_calls": []}
+
+        if require_confirmation and any(self._tool_call_requires_confirmation(c) for c in tool_calls):
+            return {
+                "status": "confirmation_required",
+                "response": first,
+                "tool_calls": tool_calls,
+                "task": task,
+            }
+
+        tool_results = self._execute_tool_calls(tool_calls)
+        final = self._finalize_with_tool_results(messages, first, tool_results)
+        return {
+            "status": "final",
+            "response": final,
+            "tool_calls": tool_calls,
+            "tool_results": tool_results,
+        }
+
+    def approve_tool_calls(self, pending_action: Dict[str, Any]) -> Dict[str, Any]:
+        task = pending_action.get("task", "")
+        tool_calls = pending_action.get("tool_calls", [])
+        first_response = pending_action.get("response", "")
+
+        messages = self._build_tool_messages(task)
+        tool_results = self._execute_tool_calls(tool_calls)
+        final = self._finalize_with_tool_results(messages, first_response, tool_results)
+        return {"status": "final", "response": final, "tool_results": tool_results}
+
     def read_file(self, path: str) -> Dict[str, Any]:
         """Чтение файла через tool server"""
         try:
-            response = requests.post(f"{self.tool_url}/tools/read_file", json={"path": path}, timeout=10)
+            response = requests.post(
+                f"{self.tool_url}/tools/read_file",
+                json={"path": path},
+                headers=self._tool_headers(),
+                timeout=10,
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -338,7 +586,10 @@ class Agent:
         """Запись файла через patch"""
         try:
             response = requests.post(
-                f"{self.tool_url}/tools/write_file_patch", json={"path": path, "patch": patch}, timeout=10
+                f"{self.tool_url}/tools/write_file_patch",
+                json={"path": path, "patch": patch},
+                headers=self._tool_headers(),
+                timeout=10,
             )
             response.raise_for_status()
             return response.json()
@@ -440,6 +691,15 @@ class Agent:
         - Inject repo snapshot if available
         - Only do 2-pass if READ_FILE is really needed
         """
+        if self.is_director:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are the Project Director. Do not request files or tools. Provide concise decisions.",
+                },
+                {"role": "user", "content": task},
+            ]
+            return self._call_llm(messages)
 
         system = (
             "You are an autonomous software agent.\n"
@@ -454,27 +714,7 @@ class Agent:
 
         # ---- Load repo snapshot once (track as retrieval) ----
         if self.repo_snapshot is None:
-            retrieval_start = time.perf_counter()
-            try:
-                r = requests.post(
-                    f"{self.tool_url}/tools/list_dir",
-                    json={"path": "."},
-                    timeout=10,
-                )
-                r.raise_for_status()
-                items = r.json().get("items", [])
-                lines = []
-                for it in items:
-                    prefix = "[DIR]" if it["type"] == "dir" else "[FILE]"
-                    lines.append(f"{prefix} {it['name']}")
-                self.repo_snapshot = "\n".join(lines)
-            except Exception as e:
-                self.repo_snapshot = f"[ERROR loading repo snapshot: {e}]"
-
-            # Track retrieval timing
-            elapsed_ms = (time.perf_counter() - retrieval_start) * 1000
-            self._retrieval_times.append(elapsed_ms)
-            self._retrieval_call_count += 1
+            self._ensure_repo_snapshot()
 
         messages = [
             {"role": "system", "content": system},
@@ -504,6 +744,7 @@ class Agent:
                 r = requests.post(
                     f"{self.tool_url}/tools/read_file",
                     json={"path": p},
+                    headers=self._tool_headers(),
                     timeout=15,
                 )
                 r.raise_for_status()

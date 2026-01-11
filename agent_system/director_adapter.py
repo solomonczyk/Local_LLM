@@ -56,8 +56,13 @@ class DirectorAdapter:
     """Адаптер для работы с OpenAI Director"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.model = "gpt-4o-mini"  # Экономичная модель
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("DIRECTOR_LLM_URL")
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self.client = OpenAI(**client_kwargs)
+        self.model = os.getenv("DIRECTOR_MODEL", "gpt-5.2")
         self.metrics = {
             'calls_today': 0,
             'total_tokens': 0,
@@ -177,7 +182,6 @@ Focus on:
             usage = response.usage
             self.metrics['total_tokens'] += usage.total_tokens
             
-            # Примерная стоимость для gpt-4o-mini
             cost = (usage.prompt_tokens * 0.00015 + usage.completion_tokens * 0.0006) / 1000
             self.metrics['total_cost'] += cost
             

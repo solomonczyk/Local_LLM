@@ -175,7 +175,7 @@ async def write_file(request: WriteFileRequest, api_key: str = Depends(verify_ap
     return result
 
 @app.post("/tools/list_dir")
-async def list_dir(request: ListDirRequest):
+async def list_dir(request: ListDirRequest, api_key: str = Depends(verify_api_key)):
     """Список файлов"""
     result = tool_executor.list_dir(request.path, request.pattern)
     if not result["success"]:
@@ -183,7 +183,7 @@ async def list_dir(request: ListDirRequest):
     return result
 
 @app.post("/tools/search")
-async def search(request: SearchRequest):
+async def search(request: SearchRequest, api_key: str = Depends(verify_api_key)):
     """Поиск в файлах"""
     result = tool_executor.search(request.query, request.globs)
     if not result["success"]:
@@ -191,7 +191,7 @@ async def search(request: SearchRequest):
     return result
 
 @app.post("/tools/git")
-async def git(request: GitRequest):
+async def git(request: GitRequest, api_key: str = Depends(verify_api_key)):
     """Git команды"""
     result = tool_executor.git(request.cmd)
     if not result["success"]:
@@ -207,7 +207,7 @@ async def shell(request: ShellRequest, api_key: str = Depends(verify_api_key)):
     return result
 
 @app.post("/tools/system_info")
-async def system_info(request: SystemInfoRequest):
+async def system_info(request: SystemInfoRequest, api_key: str = Depends(verify_api_key)):
     """Системная информация"""
     result = tool_executor.system_info(request.info_type)
     if not result["success"]:
@@ -215,7 +215,7 @@ async def system_info(request: SystemInfoRequest):
     return result
 
 @app.post("/tools/network_info")
-async def network_info(request: NetworkInfoRequest):
+async def network_info(request: NetworkInfoRequest, api_key: str = Depends(verify_api_key)):
     """Сетевая информация"""
     result = tool_executor.network_info()
     if not result["success"]:
@@ -223,7 +223,7 @@ async def network_info(request: NetworkInfoRequest):
     return result
 
 @app.post("/tools/delete_file")
-async def delete_file(request: DeleteFileRequest):
+async def delete_file(request: DeleteFileRequest, api_key: str = Depends(verify_api_key)):
     """Удаление файла"""
     result = tool_executor.delete_file(request.path)
     if not result["success"]:
@@ -231,7 +231,7 @@ async def delete_file(request: DeleteFileRequest):
     return result
 
 @app.post("/tools/edit_file")
-async def edit_file(request: EditFileRequest):
+async def edit_file(request: EditFileRequest, api_key: str = Depends(verify_api_key)):
     """Редактирование файла"""
     result = tool_executor.edit_file(request.path, request.old_text, request.new_text)
     if not result["success"]:
@@ -239,7 +239,7 @@ async def edit_file(request: EditFileRequest):
     return result
 
 @app.post("/tools/copy_file")
-async def copy_file(request: CopyFileRequest):
+async def copy_file(request: CopyFileRequest, api_key: str = Depends(verify_api_key)):
     """Копирование файла"""
     result = tool_executor.copy_file(request.source_path, request.dest_path)
     if not result["success"]:
@@ -247,7 +247,7 @@ async def copy_file(request: CopyFileRequest):
     return result
 
 @app.post("/tools/move_file")
-async def move_file(request: MoveFileRequest):
+async def move_file(request: MoveFileRequest, api_key: str = Depends(verify_api_key)):
     """Перемещение/переименование файла"""
     result = tool_executor.move_file(request.source_path, request.dest_path)
     if not result["success"]:
@@ -255,7 +255,7 @@ async def move_file(request: MoveFileRequest):
     return result
 
 @app.post("/tools/db_add_connection")
-async def db_add_connection(request: DatabaseConnectionRequest):
+async def db_add_connection(request: DatabaseConnectionRequest, api_key: str = Depends(verify_api_key)):
     """Добавить подключение к БД"""
     connection_params = {
         "host": request.host,
@@ -270,7 +270,7 @@ async def db_add_connection(request: DatabaseConnectionRequest):
     return result
 
 @app.post("/tools/db_execute_query")
-async def db_execute_query(request: DatabaseQueryRequest):
+async def db_execute_query(request: DatabaseQueryRequest, api_key: str = Depends(verify_api_key)):
     """Выполнить SQL запрос"""
     result = db_manager.execute_query(request.connection_name, request.query, request.params)
     if not result["success"]:
@@ -278,7 +278,7 @@ async def db_execute_query(request: DatabaseQueryRequest):
     return result
 
 @app.post("/tools/db_get_schema")
-async def db_get_schema(request: DatabaseSchemaRequest):
+async def db_get_schema(request: DatabaseSchemaRequest, api_key: str = Depends(verify_api_key)):
     """Получить схему БД"""
     result = db_manager.get_schema_info(request.connection_name, request.table_name)
     if not result["success"]:
@@ -286,7 +286,7 @@ async def db_get_schema(request: DatabaseSchemaRequest):
     return result
 
 @app.post("/tools/memory_init")
-async def memory_init(request: MemoryInitRequest):
+async def memory_init(request: MemoryInitRequest, api_key: str = Depends(verify_api_key)):
     """Инициализация схемы памяти в PostgreSQL"""
     if not MEMORY_POSTGRES_AVAILABLE:
         raise HTTPException(status_code=400, detail="PostgreSQL memory not available")
@@ -300,7 +300,7 @@ async def memory_init(request: MemoryInitRequest):
     return result
 
 @app.post("/tools/memory_search")
-async def memory_search(request: MemorySearchRequest):
+async def memory_search(request: MemorySearchRequest, api_key: str = Depends(verify_api_key)):
     """Поиск в памяти агента"""
     if not MEMORY_POSTGRES_AVAILABLE:
         raise HTTPException(status_code=400, detail="PostgreSQL memory not available")
@@ -311,7 +311,7 @@ async def memory_search(request: MemorySearchRequest):
     return result
 
 @app.get("/tools/memory_status")
-async def memory_status():
+async def memory_status(api_key: str = Depends(verify_api_key)):
     """Статус системы памяти"""
     return {
         "postgres_available": MEMORY_POSTGRES_AVAILABLE,
@@ -325,12 +325,12 @@ async def memory_status():
     }
 
 @app.get("/audit/recent")
-async def get_recent_audit(limit: int = 100):
+async def get_recent_audit(limit: int = 100, api_key: str = Depends(verify_api_key)):
     """Получить последние действия из audit log"""
     return {"actions": audit_logger.get_recent_actions(limit)}
 
 @app.get("/config")
-async def get_config():
+async def get_config(api_key: str = Depends(verify_api_key)):
     """Текущая конфигурация"""
     return {
         "workspace": str(SecurityConfig.WORKSPACE_ROOT),

@@ -66,3 +66,4 @@ director_circuit_breaker.jsonl
 # Временные файлы безопасности
 security_*.json
 auth_*.txt
+body.json

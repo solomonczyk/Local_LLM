@@ -1,8 +1,16 @@
+import os
 import re
 
 import requests
 
-TOOL_BASE = "http://localhost:8001"
+TOOL_BASE = os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
+TOOL_API_KEY = os.getenv("AGENT_API_KEY")
+
+def _tool_headers():
+    headers = {}
+    if TOOL_API_KEY:
+        headers["Authorization"] = f"Bearer {TOOL_API_KEY}"
+    return headers
 
 def run_planner(messages: list) -> list:
     """
@@ -21,6 +29,7 @@ def run_planner(messages: list) -> list:
         resp = requests.post(
             f"{TOOL_BASE}/tools/read_file",
             json={"path": path.strip()},
+            headers=_tool_headers(),
             timeout=10,
         )
         resp.raise_for_status()

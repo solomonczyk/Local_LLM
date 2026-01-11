@@ -66,7 +66,14 @@ app.add_middleware(
 )
 
 # URL tool сервера
-TOOL_SERVER_URL = "http://localhost:8001"
+TOOL_SERVER_URL = os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
+TOOL_API_KEY = os.getenv("AGENT_API_KEY")
+
+def _tool_headers():
+    headers = {}
+    if TOOL_API_KEY:
+        headers["Authorization"] = f"Bearer {TOOL_API_KEY}"
+    return headers
 
 class ChatRequest(BaseModel):
     model: str
@@ -157,7 +164,12 @@ def generate_smart_response(text: str, context_summary: str = "") -> str:
     # Проверяем системные запросы
     if any(word in text_lower for word in ["диск", "disk", "drive", "hdd", "ssd"]):
         try:
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "disks"}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/system_info",
+                json={"info_type": "disks"},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success") and "disks" in data:
@@ -182,7 +194,12 @@ def generate_smart_response(text: str, context_summary: str = "") -> str:
     # Остальные системные запросы (память, сеть, процессы)
     elif any(word in text_lower for word in ["память", "memory", "ram", "оперативн", "сколько памяти"]):
         try:
-            response = requests.post(f"{TOOL_SERVER_URL}/tools/system_info", json={"info_type": "memory"}, timeout=5)
+            response = requests.post(
+                f"{TOOL_SERVER_URL}/tools/system_info",
+                json={"info_type": "memory"},
+                headers=_tool_headers(),
+                timeout=5,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data.get("success"):
@@ -214,7 +231,12 @@ def generate_smart_response(text: str, context_summary: str = "") -> str:
 
         if file_path:
             try:
-                response = requests.post(f"{TOOL_SERVER_URL}/tools/read_file", json={"path": file_path}, timeout=5)
+                response = requests.post(
+                    f"{TOOL_SERVER_URL}/tools/read_file",
+                    json={"path": file_path},
+                    headers=_tool_headers(),
+                    timeout=5,
+                )
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):

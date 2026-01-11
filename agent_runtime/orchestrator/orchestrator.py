@@ -109,15 +109,27 @@ class Orchestrator:
             agent = self.agents[agent_name]
 
             try:
-                response = agent.think(task)
+                result = agent.think_with_tools(task)
+
+                if result.get("status") == "confirmation_required":
+                    return {
+                        "success": True,
+                        "mode": "single",
+                        "agent": agent_name,
+                        "task": task,
+                        "response": "Confirmation required for requested actions.",
+                        "requires_confirmation": True,
+                        "pending_action": result,
+                    }
 
                 return {
                     "success": True,
                     "mode": "single",
                     "agent": agent_name,
                     "task": task,
-                    "response": response,
-                    "actions": [],
+                    "response": result.get("response", ""),
+                    "actions": result.get("tool_calls", []),
+                    "tool_results": result.get("tool_results", []),
                 }
 
             except Exception as e:
@@ -135,6 +147,21 @@ class Orchestrator:
 
             return {"success": True, "agent": agent_name, "file": file_path, "question": question, "answer": response}
 
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def approve_pending_action(self, pending_action: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute previously requested tool calls after user confirmation."""
+        agent = self.agents.get("dev")
+        if not agent:
+            return {"success": False, "error": "Agent dev not found"}
+        try:
+            result = agent.approve_tool_calls(pending_action)
+            return {
+                "success": True,
+                "response": result.get("response", ""),
+                "tool_results": result.get("tool_results", []),
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -183,4 +210,4 @@ def get_orchestrator() -> Orchestrator:
     return _orchestrator_instance
 
 # Для обратной совместимости
-orchestrator = None
+orchestrator = get_orchestrator()
