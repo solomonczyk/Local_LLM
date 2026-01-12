@@ -116,7 +116,7 @@ class AgentConfig:
         CURRENT_ACCESS_LEVEL = ACCESS_LEVEL_SAFE_WRITE
 
     # LLM endpoints
-    LLM_BASE_URL = "http://localhost:8000/v1"
+    LLM_BASE_URL = "http://localhost:8010/v1"
     LLM_MODEL = "qwen2.5-coder-lora"
 
     # Tool server

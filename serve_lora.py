@@ -1,6 +1,6 @@
-"""
+﻿"""
 Локальный OpenAI-совместимый сервер с обученной LoRA моделью
-Запускает на http://localhost:8000
+Запускает на http://localhost:8010
 """
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -139,6 +139,7 @@ async def health_check_v1():
     return await health_check()
 
 if __name__ == "__main__":
-    print("\n🚀 Сервер запущен на http://localhost:8001")
-    print("📝 OpenAI API endpoint: http://localhost:8001/v1")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    print("\n🚀 Сервер запущен на http://localhost:8010")
+    print("📝 OpenAI API endpoint: http://localhost:8010/v1")
+    uvicorn.run(app, host="0.0.0.0", port=8010)
+

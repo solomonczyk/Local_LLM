@@ -1,4 +1,4 @@
-"""
+﻿"""
 Тест Health Check для LLM
 """
 from agent_runtime.orchestrator.agent import Agent
@@ -24,10 +24,10 @@ def test_agent_health_check():
     print("[OK] Correctly detected unhealthy server")
 
     # Тест с реальным сервером (если запущен)
-    agent_real = Agent(name="RealAgent", role="Test", llm_url="http://localhost:8000/v1")
+    agent_real = Agent(name="RealAgent", role="Test", llm_url="http://localhost:8010/v1")
 
     result_real = agent_real.check_llm_health(timeout=5.0)
-    print(f"\nHealth check (localhost:8000):")
+    print(f"\nHealth check (localhost:8010):")
     print(f"  healthy: {result_real['healthy']}")
     print(f"  status: {result_real['status']}")
     if result_real["healthy"]:
@@ -117,3 +117,4 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("[SUCCESS] All health check tests passed!")
     print("=" * 60)
+

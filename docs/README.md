@@ -1,5 +1,12 @@
 # Documentation
 
+## Docker Quick Start
+- Start core services: `docker compose up --build -d postgres agent-system nginx`
+- UI: `http://localhost:8080` (via nginx) or `http://localhost:7865` (direct)
+- LLM API: `http://localhost:8002/health`
+- Tools API: `http://localhost:8003/health`
+- Optional HTTPS: `docker compose --profile https up -d nginx-https` -> `https://localhost:8443` (self-signed)
+
 ## Usage
 - docs/usage/UI_USAGE.md
 

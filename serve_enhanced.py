@@ -1,6 +1,6 @@
-"""
+﻿"""
 Enhanced Mock OpenAI-совместимый сервер с естественным взаимодействием
-Запускает на http://localhost:8000
+Запускает на http://localhost:8010
 """
 import os
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -407,7 +407,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000, help="Port to run on")
+    parser.add_argument("--port", type=int, default=8010, help="Port to run on")
     args = parser.parse_args()
 
     print(f"\n🚀 Enhanced Mock сервер запущен на http://localhost:{args.port}")
@@ -417,3 +417,4 @@ if __name__ == "__main__":
     else:
         print("⚠️  Basic mode: простые ответы без контекста")
     uvicorn.run(app, host="0.0.0.0", port=args.port)
+

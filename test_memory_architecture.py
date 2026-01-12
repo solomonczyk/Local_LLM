@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Тест архитектуры PostgreSQL памяти (без реального подключения)
 """
@@ -8,7 +8,7 @@ def test_memory_system_availability():
     """Проверка доступности системы памяти"""
     print("=== Testing Memory System Availability ===")
 
-    response = requests.get("http://localhost:8001/tools/memory_status")
+    response = requests.get("http://localhost:8011/tools/memory_status")
 
     if response.status_code == 200:
         data = response.json()
@@ -142,7 +142,7 @@ def test_enhanced_server_memory_integration():
 
     # Проверяем, что enhanced сервер использует PostgreSQL память
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={"model": "enhanced-model", "messages": [{"role": "user", "content": "Тест интеграции памяти"}]},
     )
 
@@ -207,3 +207,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

@@ -32,7 +32,7 @@ GRANT ALL PRIVILEGES ON DATABASE agent_memory TO agent_user;
 
 ### 3. Настройка подключения в агенте
 
-#### Через UI (http://localhost:7864):
+#### Через UI (http://localhost:7865):
 ```
 Пользователь: Подключи базу данных agent_memory на localhost с пользователем agent_user
 
@@ -41,7 +41,7 @@ GRANT ALL PRIVILEGES ON DATABASE agent_memory TO agent_user;
 
 #### Через API:
 ```bash
-curl -X POST http://localhost:8001/tools/db_add_connection \
+curl -X POST http://localhost:8003/tools/db_add_connection \
   -H "Content-Type: application/json" \
   -d '{
     "name": "agent_memory",
@@ -55,7 +55,7 @@ curl -X POST http://localhost:8001/tools/db_add_connection \
 
 ### 4. Инициализация схемы памяти
 ```bash
-curl -X POST http://localhost:8001/tools/memory_init \
+curl -X POST http://localhost:8003/tools/memory_init \
   -H "Content-Type: application/json" \
   -d '{"connection_name": "agent_memory"}'
 ```

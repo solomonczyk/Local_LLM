@@ -1,6 +1,6 @@
-"""
+﻿"""
 Enhanced Mock OpenAI-совместимый сервер с естественным взаимодействием
-Запускает на http://localhost:8000
+Запускает на http://localhost:8010
 """
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -427,7 +427,8 @@ print("Hello World")'
 if __name__ == "__main__":
     import asyncio
 
-    print("\n🚀 Mock сервер запущен на http://localhost:8000")
-    print("📝 OpenAI API endpoint: http://localhost:8000/v1")
+    print("\n🚀 Mock сервер запущен на http://localhost:8010")
+    print("📝 OpenAI API endpoint: http://localhost:8010/v1")
     print("⚠️  Это тестовый сервер с заготовленными ответами")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8010)
+

@@ -13,8 +13,7 @@ sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 
 # Установка Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+sudo apt install docker-compose-plugin
 
 # Перезагрузка для применения изменений
 sudo reboot
@@ -34,13 +33,13 @@ chmod +x deploy.sh
 ### 3. Проверка работы
 ```bash
 # Проверка статуса сервисов
-docker-compose ps
+docker compose ps
 
 # Просмотр логов
-docker-compose logs -f
+docker compose logs -f
 
 # Проверка здоровья
-curl http://localhost:8000/health
+curl http://localhost:8002/health
 ```
 
 ## 🏗️ Архитектура деплоя
@@ -54,7 +53,7 @@ curl http://localhost:8000/health
          ▼
 ┌─────────────────┐
 │ Agent System    │ ← Основное приложение
-│   Container     │   Порты: 7864, 8000, 8001
+│   Container     │   Порты: 7865, 8002, 8003
 └─────────────────┘
          │
          ▼
@@ -85,9 +84,9 @@ DOMAIN=your-domain.com          # Для SSL
 ```
 
 ### Порты
-- **7864** - Web UI (Gradio интерфейс)
-- **8000** - LLM API (OpenAI-совместимый)
-- **8001** - Tools API (системные инструменты)
+- **7865** - Web UI (Gradio интерфейс)
+- **8002** - LLM API (OpenAI-совместимый)
+- **8003** - Tools API (системные инструменты)
 - **5432** - PostgreSQL (внутренний)
 - **80/443** - Nginx (если используется)
 
@@ -96,26 +95,26 @@ DOMAIN=your-domain.com          # Для SSL
 ### Проверка здоровья сервисов
 ```bash
 # Статус контейнеров
-docker-compose ps
+docker compose ps
 
 # Использование ресурсов
 docker stats
 
 # Логи сервисов
-docker-compose logs agent-system
-docker-compose logs postgres
+docker compose logs agent-system
+docker compose logs postgres
 ```
 
 ### Health Check эндпоинты
 ```bash
 # Основное приложение
-curl http://localhost:8000/health
+curl http://localhost:8002/health
 
 # Система памяти
-curl http://localhost:8001/tools/memory_status
+curl http://localhost:8003/tools/memory_status
 
 # UI (должен вернуть HTML)
-curl http://localhost:7864
+curl http://localhost:7865
 ```
 
 ## 🔒 Безопасность
@@ -182,16 +181,16 @@ services:
 ### PostgreSQL бэкап
 ```bash
 # Создание бэкапа
-docker-compose exec postgres pg_dump -U agent_user agent_memory > backup_$(date +%Y%m%d_%H%M%S).sql
+docker compose exec postgres pg_dump -U agent_user agent_memory > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Восстановление
-docker-compose exec -T postgres psql -U agent_user agent_memory < backup_file.sql
+docker compose exec -T postgres psql -U agent_user agent_memory < backup_file.sql
 ```
 
 ### Автоматические бэкапы
 ```bash
 # Добавить в crontab
-0 2 * * * cd /path/to/agent-system && docker-compose exec postgres pg_dump -U agent_user agent_memory > backups/backup_$(date +\%Y\%m\%d_\%H\%M\%S).sql
+0 2 * * * cd /path/to/agent-system && docker compose exec postgres pg_dump -U agent_user agent_memory > backups/backup_$(date +\%Y\%m\%d_\%H\%M\%S).sql
 ```
 
 ## 🔄 Обновление
@@ -199,7 +198,7 @@ docker-compose exec -T postgres psql -U agent_user agent_memory < backup_file.sq
 ### Обновление системы
 ```bash
 # Остановка сервисов
-docker-compose down
+docker compose down
 
 # Обновление кода
 git pull
@@ -214,8 +213,8 @@ git pull
 git checkout previous-version
 
 # Пересборка
-docker-compose build --no-cache
-docker-compose up -d
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ## 🐛 Troubleshooting
@@ -225,28 +224,28 @@ docker-compose up -d
 #### Сервис не запускается
 ```bash
 # Проверить логи
-docker-compose logs service-name
+docker compose logs service-name
 
 # Проверить ресурсы
 docker stats
 
 # Перезапустить сервис
-docker-compose restart service-name
+docker compose restart service-name
 ```
 
 #### База данных недоступна
 ```bash
 # Проверить статус PostgreSQL
-docker-compose exec postgres pg_isready -U agent_user
+docker compose exec postgres pg_isready -U agent_user
 
 # Проверить подключение
-docker-compose exec postgres psql -U agent_user -d agent_memory -c "SELECT 1;"
+docker compose exec postgres psql -U agent_user -d agent_memory -c "SELECT 1;"
 ```
 
 #### Порты заняты
 ```bash
 # Найти процесс на порту
-sudo netstat -tulpn | grep :8000
+sudo netstat -tulpn | grep :8002
 
 # Остановить конфликтующий сервис
 sudo systemctl stop service-name
@@ -255,9 +254,9 @@ sudo systemctl stop service-name
 ## 📞 Поддержка
 
 При проблемах с деплоем:
-1. Проверьте логи: `docker-compose logs -f`
+1. Проверьте логи: `docker compose logs -f`
 2. Убедитесь в доступности ресурсов: `docker stats`
 3. Проверьте конфигурацию: `.env` файл
-4. Перезапустите сервисы: `docker-compose restart`
+4. Перезапустите сервисы: `docker compose restart`
 
 **Система готова к продакшен использованию!** 🎉

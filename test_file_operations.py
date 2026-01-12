@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Тест файловых операций через агентскую систему
 """
@@ -19,7 +19,7 @@ def test_function():
 """
 
     response = requests.post(
-        "http://localhost:8001/tools/write_file",
+        "http://localhost:8011/tools/write_file",
         json={"path": "test_agent_file.py", "content": test_content, "mode": "overwrite"},
     )
 
@@ -37,7 +37,7 @@ def test_read_file_via_agent():
     print("\n=== Testing File Reading via Agent ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={"model": "mock-model", "messages": [{"role": "user", "content": "прочитай файл test_agent_file.py"}]},
     )
 
@@ -62,7 +62,7 @@ def test_list_files_via_agent():
     print("\n=== Testing File Listing via Agent ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={"model": "mock-model", "messages": [{"role": "user", "content": "покажи список файлов в текущей папке"}]},
     )
 
@@ -87,7 +87,7 @@ def test_edit_file():
     print("\n=== Testing File Editing ===")
 
     response = requests.post(
-        "http://localhost:8001/tools/edit_file",
+        "http://localhost:8011/tools/edit_file",
         json={
             "path": "test_agent_file.py",
             "old_text": "Hello from agent system!",
@@ -110,7 +110,7 @@ def test_copy_file():
     print("\n=== Testing File Copying ===")
 
     response = requests.post(
-        "http://localhost:8001/tools/copy_file",
+        "http://localhost:8011/tools/copy_file",
         json={"source_path": "test_agent_file.py", "dest_path": "test_agent_file_copy.py"},
     )
 
@@ -130,7 +130,7 @@ def test_delete_file_via_agent():
     print("\n=== Testing File Deletion via Agent ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={"model": "mock-model", "messages": [{"role": "user", "content": "удали файл test_agent_file_copy.py"}]},
     )
 
@@ -216,3 +216,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

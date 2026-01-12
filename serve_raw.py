@@ -1,4 +1,4 @@
-import os
+﻿import os
 import time
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -48,7 +48,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000, help="Port to run on")
+    parser.add_argument("--port", type=int, default=8010, help="Port to run on")
     args = parser.parse_args()
 
     uvicorn.run(app, host="0.0.0.0", port=args.port)
+

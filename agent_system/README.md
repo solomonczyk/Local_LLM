@@ -16,7 +16,7 @@
 ┌─────────┐ ┌──────────┐
 │ LLM     │ │ Tool     │
 │ Server  │ │ Server   │
-│ :8000   │ │ :8001    │
+│ :8010   │ │ :8011    │
 └─────────┘ └──────────┘
 ```
 
@@ -25,14 +25,14 @@
 ### 1. LLM Server (serve_lora.py)
 - Локальная модель Qwen2.5 Coder + LoRA
 - OpenAI-compatible API
-- Порт: 8000
+- Порт: 8010
 
 ### 2. Tool Server (tool_server.py)
 - Безопасное выполнение файловых операций
 - Git команды
 - Shell команды (ограниченно)
 - Audit logging
-- Порт: 8001
+- Порт: 8011
 
 ### 3. Orchestrator (в разработке)
 - Управление мультиагентным консилиумом
@@ -84,7 +84,7 @@ python serve_lora.py
 
 ## API Endpoints
 
-### Tool Server (http://localhost:8001)
+### Tool Server (http://localhost:8011)
 
 #### POST /tools/read_file
 ```json
@@ -146,6 +146,6 @@ python serve_lora.py
 python -m agent_system.tool_server
 
 # В другом терминале - тесты
-curl http://localhost:8001/
-curl -X POST http://localhost:8001/tools/list_dir -H "Content-Type: application/json" -d '{"path": "."}'
+curl http://localhost:8011/
+curl -X POST http://localhost:8011/tools/list_dir -H "Content-Type: application/json" -d '{"path": "."}'
 ```

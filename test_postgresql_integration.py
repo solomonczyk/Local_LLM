@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Тест интеграции с PostgreSQL
 """
@@ -54,7 +54,7 @@ def test_database_conversation():
         print(f"\n🤖 Запрос: {query}")
 
         response = requests.post(
-            "http://localhost:8000/v1/chat/completions",
+            "http://localhost:8010/v1/chat/completions",
             json={"model": "enhanced-model", "messages": [{"role": "user", "content": query}]},
         )
 
@@ -90,7 +90,7 @@ def test_tool_server_db_endpoints():
     for endpoint in endpoints_to_test:
         try:
             # Отправляем POST запрос с неполными данными, чтобы получить ошибку валидации
-            response = requests.post(f"http://localhost:8001{endpoint}", json={})
+            response = requests.post(f"http://localhost:8011{endpoint}", json={})
 
             # Ожидаем ошибку 422 (валидация) или 400 (бизнес-логика)
             if response.status_code in [400, 422]:
@@ -251,3 +251,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

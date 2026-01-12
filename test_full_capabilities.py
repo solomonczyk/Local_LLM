@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Полный тест всех возможностей агентской системы
 """
@@ -10,7 +10,7 @@ def test_agent_query(query: str, expected_keywords: list = None) -> bool:
     print(f"\n🤖 Запрос: {query}")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={"model": "mock-model", "messages": [{"role": "user", "content": query}]},
     )
 
@@ -118,3 +118,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

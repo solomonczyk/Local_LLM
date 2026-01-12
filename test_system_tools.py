@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Тест системных инструментов через mock сервер
 """
@@ -11,7 +11,7 @@ def test_disk_info():
 
     # Тестируем через mock сервер
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "mock-model",
             "messages": [
@@ -42,7 +42,7 @@ def test_memory_info():
     print("\n=== Testing Memory Info ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={"model": "mock-model", "messages": [{"role": "user", "content": "сколько памяти на моем компьютере?"}]},
     )
 
@@ -67,7 +67,7 @@ def test_network_info():
     print("\n=== Testing Network Info ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "mock-model",
             "messages": [{"role": "user", "content": "какие сетевые интерфейсы есть на моем компьютере?"}],
@@ -96,7 +96,7 @@ def test_direct_tool_server():
 
     try:
         # Тест системной информации
-        response = requests.post("http://localhost:8001/tools/system_info", json={"info_type": "disks"})
+        response = requests.post("http://localhost:8011/tools/system_info", json={"info_type": "disks"})
 
         if response.status_code == 200:
             data = response.json()
@@ -153,3 +153,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

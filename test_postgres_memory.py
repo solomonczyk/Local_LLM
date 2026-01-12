@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Тест PostgreSQL памяти агента
 """
@@ -10,7 +10,7 @@ def test_memory_status():
     """Проверка статуса системы памяти"""
     print("=== Testing Memory Status ===")
 
-    response = requests.get("http://localhost:8001/tools/memory_status")
+    response = requests.get("http://localhost:8011/tools/memory_status")
 
     if response.status_code == 200:
         data = response.json()
@@ -27,7 +27,7 @@ def test_memory_initialization():
     """Тест инициализации схемы памяти"""
     print("\n=== Testing Memory Initialization ===")
 
-    response = requests.post("http://localhost:8001/tools/memory_init", json={"connection_name": "agent_memory"})
+    response = requests.post("http://localhost:8011/tools/memory_init", json={"connection_name": "agent_memory"})
 
     if response.status_code == 200:
         data = response.json()
@@ -45,7 +45,7 @@ def test_conversation_with_postgres_memory():
 
     # Первое сообщение
     response1 = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "enhanced-model",
             "messages": [
@@ -68,7 +68,7 @@ def test_conversation_with_postgres_memory():
 
         # Второе сообщение - проверяем память
         response2 = requests.post(
-            "http://localhost:8000/v1/chat/completions",
+            "http://localhost:8010/v1/chat/completions",
             json={
                 "model": "enhanced-model",
                 "messages": [
@@ -140,7 +140,7 @@ def test_memory_search():
         search_results = 0
         for query in search_queries:
             response = requests.post(
-                "http://localhost:8001/tools/memory_search",
+                "http://localhost:8011/tools/memory_search",
                 json={"session_id": session_id, "query": query, "limit": 10},
             )
 
@@ -263,3 +263,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

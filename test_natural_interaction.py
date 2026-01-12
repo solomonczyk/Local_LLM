@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Тест естественного взаимодействия с агентом
 """
@@ -11,7 +11,7 @@ def test_conversation_memory():
 
     # Первое сообщение
     response1 = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "enhanced-model",
             "messages": [{"role": "user", "content": "Привет! Меня зовут Алексей, я разрабатываю Python проект"}],
@@ -26,7 +26,7 @@ def test_conversation_memory():
         # Второе сообщение - проверяем память
         time.sleep(1)
         response2 = requests.post(
-            "http://localhost:8000/v1/chat/completions",
+            "http://localhost:8010/v1/chat/completions",
             json={
                 "model": "enhanced-model",
                 "messages": [
@@ -61,7 +61,7 @@ def test_proactive_suggestions():
     print("\n=== Testing Proactive Suggestions ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "enhanced-model",
             "messages": [{"role": "user", "content": "Хочу создать новый проект, но не знаю с чего начать"}],
@@ -92,7 +92,7 @@ def test_file_operations_with_context():
     print("\n=== Testing File Operations with Context ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "enhanced-model",
             "messages": [{"role": "user", "content": "покажи список файлов в текущей папке"}],
@@ -120,7 +120,7 @@ def test_system_info_integration():
     print("\n=== Testing System Info Integration ===")
 
     response = requests.post(
-        "http://localhost:8000/v1/chat/completions",
+        "http://localhost:8010/v1/chat/completions",
         json={
             "model": "enhanced-model",
             "messages": [{"role": "user", "content": "сколько памяти на моем компьютере?"}],
@@ -147,7 +147,7 @@ def test_enhanced_mode():
     """Тест улучшенного режима"""
     print("\n=== Testing Enhanced Mode ===")
 
-    response = requests.get("http://localhost:8000/health")
+    response = requests.get("http://localhost:8010/health")
 
     if response.status_code == 200:
         data = response.json()
@@ -212,3 +212,4 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
+

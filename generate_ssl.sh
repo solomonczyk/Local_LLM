@@ -34,7 +34,9 @@ DNS.1 = agent.152.53.227.37.nip.io
 DNS.2 = api.152.53.227.37.nip.io
 DNS.3 = tools.152.53.227.37.nip.io
 DNS.4 = 152.53.227.37.nip.io
+DNS.5 = localhost
 IP.1 = 152.53.227.37
+IP.2 = 127.0.0.1
 EOF
 
 # Генерируем сертификат

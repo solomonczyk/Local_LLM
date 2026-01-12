@@ -31,11 +31,11 @@ RUN mkdir -p /app/logs /app/data /app/.agent_conversations && \
 USER agent
 
 # Открываем порты
-EXPOSE 7864 8000 8001
+EXPOSE 7864 8010 8011
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8010/health || exit 1
 
 # Команда по умолчанию
 CMD ["python", "docker_entrypoint.py"]

@@ -1,5 +1,10 @@
 # 🔒 Настройка HTTPS для Agent System
 
+## Local HTTPS (self-signed, Docker)
+```bash
+docker compose --profile https up -d nginx-https
+# UI: https://localhost:8443
+```
 ## 🎯 Цель
 Настроить бесплатный SSL сертификат от Let's Encrypt для безопасного доступа к агентской системе по HTTPS.
 
@@ -110,7 +115,7 @@ sudo certbot renew --dry-run
 sudo certbot renew
 
 # Перезапустить nginx
-docker-compose restart nginx
+docker compose restart nginx
 ```
 
 ## 📋 Проверочный список
@@ -129,13 +134,13 @@ docker-compose restart nginx
 
 ```bash
 # Остановить контейнеры
-docker-compose down
+docker compose down
 
 # Вернуть старую конфигурацию
 cp nginx.conf.backup nginx.conf
 
 # Запустить без SSL
-docker-compose up -d
+docker compose up -d
 ```
 
 ## 💡 Альтернативы
