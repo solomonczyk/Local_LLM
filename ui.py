@@ -1,4 +1,4 @@
-"""
+﻿"""
 Простой GUI для Agent System
 Запуск: python ui.py
 """
@@ -60,8 +60,6 @@ def preview_routing(task: str):
     """Предпросмотр роутинга без вызова LLM"""
     global pending_action
 
-    global pending_action
-
     if not task.strip():
         return "Enter a task to preview routing"
 
@@ -98,6 +96,7 @@ def run_task(
     use_tools: bool,
 ):
     """Выполнить задачу"""
+    global pending_action
     if not task.strip():
         yield "Please enter a task", summarize_pending_action(pending_action)
         return
@@ -412,3 +411,4 @@ if __name__ == "__main__":
         import traceback
 
         traceback.print_exc()
+

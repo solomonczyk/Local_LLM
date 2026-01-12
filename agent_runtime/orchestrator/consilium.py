@@ -1,4 +1,4 @@
-"""
+﻿"""
 Мультиагентный консилиум - несколько специализированных агентов голосуют
 """
 from __future__ import annotations
@@ -152,6 +152,10 @@ class Consilium:
             effective_mode = self.mode
             include_director = "director" in self.active_agents
             print(f"[*] Static routing: {self.mode}")
+
+        if include_director and not self.director_adapter.enabled:
+            include_director = False
+            print("[DIRECTOR] Disabled: OPENAI_API_KEY not set")
 
         print(f"[*] Consulting {len(agent_names)} agents: {agent_names}")
         print(f"[*] KB retrieval: top_k={self.kb_top_k}, max_chars={self.kb_max_chars}")
@@ -478,3 +482,6 @@ def get_consilium() -> Consilium:
 # Для обратной совместимости - property-like доступ
 # Использовать get_consilium() вместо consilium напрямую
 consilium = None  # Будет None до первого вызова get_consilium()
+
+
+

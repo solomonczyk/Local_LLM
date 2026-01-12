@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Director Adapter - интерфейс для OpenAI Director
 Реализует гибридную архитектуру: локальные workers + облачный director
@@ -56,12 +56,15 @@ class DirectorAdapter:
     """Адаптер для работы с OpenAI Director"""
     
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("DIRECTOR_LLM_URL")
-        client_kwargs = {"api_key": api_key}
-        if base_url:
-            client_kwargs["base_url"] = base_url
-        self.client = OpenAI(**client_kwargs)
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.base_url = os.getenv("DIRECTOR_LLM_URL")
+        self.enabled = bool(self.api_key)
+        self.client = None
+        if self.enabled:
+            client_kwargs = {"api_key": self.api_key}
+            if self.base_url:
+                client_kwargs["base_url"] = self.base_url
+            self.client = OpenAI(**client_kwargs)
         self.model = os.getenv("DIRECTOR_MODEL", "gpt-5.2")
         self.metrics = {
             'calls_today': 0,
@@ -150,6 +153,8 @@ Focus on:
     
     def call_director(self, request: DirectorRequest) -> DirectorResponse:
         """Вызов OpenAI Director"""
+        if not self.enabled or self.client is None:
+            raise RuntimeError("Director disabled: OPENAI_API_KEY is not set")
         
         if not request.validate():
             raise ValueError("Invalid DirectorRequest")
@@ -261,3 +266,6 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+
+
+
