@@ -49,6 +49,7 @@ services:
       # Безопасность
       AGENT_ACCESS_LEVEL: 2
       AGENT_API_KEY: dev-local-key
+      OPENAI_API_KEY: 
       
     ports:
       - "7865:7864"  # UI
@@ -114,6 +115,7 @@ volumes:
 networks:
   agent-network:
     driver: bridge
+
 
 
 

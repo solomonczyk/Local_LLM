@@ -1,4 +1,4 @@
-
+﻿
 services:
   postgres:
     image: postgres:14-alpine
@@ -35,6 +35,7 @@ services:
       KB_TOP_K: 5
       KB_MAX_CHARS: 8000
       AGENT_ACCESS_LEVEL: 2
+      OPENAI_API_KEY: 
       # Hybrid Architecture: Qwen for agents, GPT-5.2 for Director
       AGENT_LLM_URL: https://5e963ab1e6f1.ngrok-free.app/v1
       LLM_BASE: https://5e963ab1e6f1.ngrok-free.app
@@ -92,3 +93,4 @@ networks:
   agent-network:
   root_agent-network:
     external: true
+
