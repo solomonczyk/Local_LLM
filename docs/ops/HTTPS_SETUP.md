@@ -5,6 +5,8 @@
 docker compose --profile https up -d nginx-https
 # UI: https://localhost:8443
 ```
+Note: run ./generate_ssl.sh (requires openssl) before enabling HTTPS.
+
 ## 🎯 Цель
 Настроить бесплатный SSL сертификат от Let's Encrypt для безопасного доступа к агентской системе по HTTPS.
 

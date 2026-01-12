@@ -1,4 +1,4 @@
-# Virtual environments
+﻿# Virtual environments
 .venv*/
 venv/
 env/
@@ -42,7 +42,7 @@ checkpoint-*/
 runs/
 *.tfevents*
 
-# Файлы с секретами
+# Ð¤Ð°Ð¹Ð»Ñ‹ Ñ ÑÐµÐºÑ€ÐµÑ‚Ð°Ð¼Ð¸
 .env
 .env.local
 .env.production
@@ -51,19 +51,24 @@ runs/
 secrets.json
 config/secrets.yaml
 
-# Логи с потенциальными секретами
+# Ð›Ð¾Ð³Ð¸ Ñ Ð¿Ð¾Ñ‚ÐµÐ½Ñ†Ð¸Ð°Ð»ÑŒÐ½Ñ‹Ð¼Ð¸ ÑÐµÐºÑ€ÐµÑ‚Ð°Ð¼Ð¸
 *.log
 logs/
 audit_logs/
 
-# Director/Agent logs (могут содержать чувствительные данные)
+# Director/Agent logs (Ð¼Ð¾Ð³ÑƒÑ‚ ÑÐ¾Ð´ÐµÑ€Ð¶Ð°Ñ‚ÑŒ Ñ‡ÑƒÐ²ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ)
 *.jsonl
 task_run.jsonl
 active_director.jsonl
 shadow_director.jsonl
 director_circuit_breaker.jsonl
 
-# Временные файлы безопасности
+# Ð’Ñ€ÐµÐ¼ÐµÐ½Ð½Ñ‹Ðµ Ñ„Ð°Ð¹Ð»Ñ‹ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑ‚Ð¸
 security_*.json
 auth_*.txt
 body.json
+# Local SSL artifacts
+ssl/*.key
+ssl/*.crt
+ssl/*.pem
+

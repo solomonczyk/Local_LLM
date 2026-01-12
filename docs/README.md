@@ -6,6 +6,7 @@
 - LLM API: `http://localhost:8002/health`
 - Tools API: `http://localhost:8003/health`
 - Optional HTTPS: `docker compose --profile https up -d nginx-https` -> `https://localhost:8443` (self-signed)
+- If HTTPS is enabled and `ssl/` is empty, run `generate_ssl.sh` first.
 
 ## Usage
 - docs/usage/UI_USAGE.md
