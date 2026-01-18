@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from enum import Enum
 import openai
 from openai import OpenAI
+from agent_system.circuit_breaker import CircuitBreaker
+from agent_system.decision_log import append_decision_event
 
 
 class RiskLevel(Enum):
@@ -52,13 +54,28 @@ class DirectorResponse:
     reasoning: str
 
 
+_director_circuit_breaker: Optional[CircuitBreaker] = None
+
+
+def _get_director_circuit_breaker() -> CircuitBreaker:
+    global _director_circuit_breaker
+    if _director_circuit_breaker is None:
+        _director_circuit_breaker = CircuitBreaker(
+            failure_threshold=3,
+            recovery_timeout=60,
+            success_threshold=1
+        )
+    return _director_circuit_breaker
+
+
 class DirectorAdapter:
     """Адаптер для работы с OpenAI Director"""
     
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.base_url = os.getenv("DIRECTOR_LLM_URL")
-        self.enabled = bool(self.api_key)
+        self.allow_fallback = os.getenv("DIRECTOR_ENABLED", "true").lower() == "false"
+        self.enabled = bool(self.api_key) and not self.allow_fallback
         self.client = None
         if self.enabled:
             client_kwargs = {"api_key": self.api_key}
@@ -79,6 +96,7 @@ class DirectorAdapter:
             'architecture', 'migration', 'scaling', 'payment',
             'pii', 'compliance', 'database', 'infrastructure'
         }
+        self._circuit_breaker = _get_director_circuit_breaker()
     
     def should_use_director(self, task: str, confidence: float, 
                           active_domains: List[str]) -> bool:
@@ -150,14 +168,50 @@ Focus on:
 4. Practical recommendations"""
 
         return prompt
+
+    def healthcheck(self) -> bool:
+        """Check Director availability with a short ping."""
+        if not self.enabled or self.client is None:
+            if self.allow_fallback:
+                return False
+            raise RuntimeError("Director disabled: OPENAI_API_KEY is not set")
+
+        try:
+            self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_completion_tokens=16,
+            )
+            return True
+        except Exception:
+            if self.allow_fallback:
+                return False
+            raise
     
     def call_director(self, request: DirectorRequest) -> DirectorResponse:
         """Вызов OpenAI Director"""
+        def _fallback_response(reason: str) -> DirectorResponse:
+            return DirectorResponse(
+                decision="OpenAI Director unavailable - proceed with local decision",
+                risks=["Director service unavailable", "Decision made locally"],
+                recommendations=["Manual review recommended", "Retry Director call later"],
+                next_step="Proceed with caution using local agents",
+                confidence=0.3,
+                reasoning=reason
+            )
+
         if not self.enabled or self.client is None:
+            if self.allow_fallback:
+                return _fallback_response("Director disabled via DIRECTOR_ENABLED=false")
             raise RuntimeError("Director disabled: OPENAI_API_KEY is not set")
         
         if not request.validate():
             raise ValueError("Invalid DirectorRequest")
+
+        if not self._circuit_breaker.can_execute():
+            if self.allow_fallback:
+                return _fallback_response("Director circuit OPEN")
+            raise RuntimeError("Director circuit OPEN")
         
         # Обновляем метрики
         today = time.strftime('%Y-%m-%d')
@@ -171,16 +225,37 @@ Focus on:
         prompt = self.create_director_prompt(request)
         sanitized_prompt = self.sanitize_for_openai(prompt)
         
+        messages = [
+            {"role": "system", "content": "You are an expert AI Director making architectural decisions."},
+            {"role": "user", "content": sanitized_prompt},
+        ]
+        messages[-1]["content"] = messages[-1]["content"][:12000]
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are an expert AI Director making architectural decisions."},
-                    {"role": "user", "content": sanitized_prompt}
-                ],
-                temperature=0.2,
-                max_tokens=800,
-                response_format={"type": "json_object"}
+                messages=messages,
+                temperature=0,
+                max_completion_tokens=600,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "director_decision",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "decision": {"type": "string"},
+                                "risks": {"type": "array", "items": {"type": "string"}},
+                                "recommendations": {"type": "array", "items": {"type": "string"}},
+                                "next_step": {"type": "string"},
+                                "confidence": {"type": "number"},
+                                "reasoning": {"type": "string"}
+                            },
+                            "required": ["decision", "risks", "recommendations", "next_step", "confidence", "reasoning"]
+                        }
+                    }
+                }
             )
             
             # Обновляем метрики
@@ -192,7 +267,15 @@ Focus on:
             
             # Парсим ответ
             result = json.loads(response.choices[0].message.content)
-            
+
+            self._circuit_breaker.record_success()
+            append_decision_event({
+                "type": "director_decision",
+                "decision": result["decision"],
+                "confidence": result["confidence"],
+                "risks": result["risks"],
+                "next_step": result["next_step"],
+            })
             return DirectorResponse(
                 decision=result['decision'],
                 risks=result['risks'],
@@ -204,14 +287,12 @@ Focus on:
             
         except Exception as e:
             # Fallback при ошибке
-            return DirectorResponse(
-                decision="OpenAI Director unavailable - proceed with local decision",
-                risks=["Director service unavailable", "Decision made locally"],
-                recommendations=["Manual review recommended", "Retry Director call later"],
-                next_step="Proceed with caution using local agents",
-                confidence=0.3,
-                reasoning=f"Director call failed: {str(e)}"
-            )
+            print("DIRECTOR_ERR:", repr(e))
+            print("DIRECTOR_INPUT_LEN:", len(messages[-1]["content"]))
+            self._circuit_breaker.record_failure(e)
+            if self.allow_fallback:
+                return _fallback_response(f"Director call failed: {str(e)}")
+            raise
     
     def get_metrics(self) -> Dict[str, Any]:
         """Получить метрики использования"""
