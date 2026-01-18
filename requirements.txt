@@ -12,16 +12,15 @@ sqlalchemy==2.0.23
 # HTTP clients
 requests==2.32.4
 httpx==0.25.2
-openai>=1.0.0
+openai==2.15.0
 
 # Data processing
 pandas==2.0.3
 numpy==1.24.4
 
-# ML/AI (optional, for future LLM integration)
-torch==2.1.1
-transformers==4.46.3
-accelerate==1.0.1
+# ML/AI
+# Runtime stack uses GGUF + llama.cpp in a separate container, so ML training/inference
+# dependencies are intentionally not installed here. See `requirements-ml.txt`.
 
 # System monitoring
 psutil==5.9.6
