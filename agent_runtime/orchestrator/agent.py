@@ -1,11 +1,13 @@
 """
 Базовый агент с доступом к LLM и tools
 """
+import ast
 import json
+import os
 import re
 import time
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -167,6 +169,7 @@ class Agent:
 
     # Размер окна для скользящего среднего
     TIMING_WINDOW = 20
+    PREVIEW_TOOLS = {"write_file", "edit_file", "delete_file", "copy_file", "move_file"}
 
     def __init__(self, name: str = "Agent", role: str = "Generic Agent", 
                  llm_url: str = None, 
@@ -438,45 +441,1031 @@ class Agent:
             "Available tools:\n" + "\n".join(tool_lines)
         )
 
-    def _build_tool_messages(self, task: str) -> List[Dict[str, str]]:
+    def _build_tool_messages(
+        self,
+        task: str,
+        required_tools: Optional[List[str]] = None,
+        force_tools: bool = False,
+    ) -> List[Dict[str, str]]:
         self._ensure_repo_snapshot()
-        return [
+        messages = [
             {"role": "system", "content": self._build_tool_system_prompt()},
             {"role": "system", "content": "Repository snapshot:\n" + (self.repo_snapshot or "")},
-            {"role": "user", "content": task},
         ]
+        if required_tools:
+            requirement = "This task requires tool usage before answering."
+            if force_tools:
+                requirement = "You MUST call the required tools before answering."
+            requirement += f" Required tool(s): {', '.join(required_tools)}."
+            if "search" in required_tools and "read_file" in required_tools:
+                requirement += " Use search first, then read_file for the located path."
+            elif "search" in required_tools:
+                requirement += " If unsure, start with search."
+            messages.append({"role": "system", "content": requirement})
+        messages.append({"role": "user", "content": task})
+        return messages
+
+    def _required_tools_for_task(self, task: str) -> List[str]:
+        lower = task.lower()
+        required: List[str] = []
+
+        if re.search(r"\b(search|find|locate|grep|поиск|найти|найди|искать)\b", lower):
+            required.append("search")
+
+        file_hint = re.search(
+            r"\b(docker-compose|nginx|config|конфиг|настройк|yaml|yml|json|toml|ini|env|\.conf)\b",
+            lower,
+        )
+        file_path_match = re.search(
+            r"\b[\w./-]+\.(py|js|ts|md|yml|yaml|json|toml|ini|conf|env|sh|ps1)\b",
+            task,
+        )
+        has_explicit_path = False
+        if file_path_match:
+            token = file_path_match.group(0)
+            has_explicit_path = "/" in token or "\\" in token
+
+        if file_hint or file_path_match:
+            if not has_explicit_path:
+                required.append("search")
+            required.append("read_file")
+
+        if not required and re.search(r"\b(list|dir|directory|folders|список\w*|папк\w*|каталог\w*|директори\w*)\b", lower):
+            required.append("list_dir")
+
+        return list(dict.fromkeys(required))
+
+    def _missing_required_tools(self, calls: List[Dict[str, Any]], required: List[str]) -> List[str]:
+        used = {call.get("tool") for call in calls if isinstance(call.get("tool"), str)}
+        return [tool for tool in required if tool not in used]
+
+    def _normalize_path(self, path: str) -> str:
+        value = path.strip().replace("\\", "/")
+        return os.path.normpath(value)
+
+    def _validate_path_value(self, path: Any, allow_dot: bool) -> Tuple[bool, str, str]:
+        if not isinstance(path, str):
+            return False, "", "path must be a string"
+        raw = path.strip()
+        if not raw:
+            return False, "", "path is empty"
+
+        normalized = self._normalize_path(raw)
+        if normalized in {"/"}:
+            return False, normalized, "absolute root is not allowed"
+        if not allow_dot and normalized in {".", ""}:
+            return False, normalized, "path cannot be the workspace root"
+        if normalized.startswith(".."):
+            return False, normalized, "path traversal is not allowed"
+        if re.match(r"^[A-Za-z]:", normalized):
+            return False, normalized, "absolute Windows path is not allowed"
+
+        return True, normalized, ""
+
+    def _validate_tool_args(self, tool: str, args: Any) -> Tuple[bool, Dict[str, Any], str]:
+        if tool not in TOOL_SPECS:
+            return False, {}, "unknown tool"
+        if not isinstance(args, dict):
+            return False, {}, "args must be an object"
+
+        cleaned: Dict[str, Any] = dict(args)
+
+        if tool == "read_file":
+            ok, norm, err = self._validate_path_value(cleaned.get("path"), allow_dot=False)
+            return ok, {"path": norm} if ok else {}, err
+
+        if tool == "list_dir":
+            path_value = cleaned.get("path", ".")
+            ok, norm, err = self._validate_path_value(path_value, allow_dot=True)
+            if not ok:
+                return False, {}, err
+            pattern = cleaned.get("pattern", "*")
+            if not isinstance(pattern, str) or not pattern.strip():
+                return False, {}, "pattern must be a non-empty string"
+            return True, {"path": norm, "pattern": pattern}, ""
+
+        if tool == "search":
+            query = cleaned.get("query")
+            if not isinstance(query, str) or not query.strip():
+                return False, {}, "query must be a non-empty string"
+            globs = cleaned.get("globs")
+            if globs is None:
+                return True, {"query": query}, ""
+            if isinstance(globs, list) and all(isinstance(g, str) for g in globs):
+                return True, {"query": query, "globs": globs}, ""
+            return False, {}, "globs must be a list of strings"
+
+        if tool == "write_file":
+            ok, norm, err = self._validate_path_value(cleaned.get("path"), allow_dot=False)
+            if not ok:
+                return False, {}, err
+            content = cleaned.get("content")
+            if not isinstance(content, str):
+                return False, {}, "content must be a string"
+            mode = cleaned.get("mode", "overwrite")
+            if mode not in {"overwrite", "append"}:
+                return False, {}, "mode must be overwrite or append"
+            expected_sha256 = cleaned.get("expected_sha256")
+            if expected_sha256 is not None and not isinstance(expected_sha256, str):
+                return False, {}, "expected_sha256 must be a string"
+            expected_exists = cleaned.get("expected_exists")
+            if expected_exists is not None and not isinstance(expected_exists, bool):
+                return False, {}, "expected_exists must be a boolean"
+            payload = {"path": norm, "content": content, "mode": mode}
+            if expected_sha256 is not None:
+                payload["expected_sha256"] = expected_sha256
+            if expected_exists is not None:
+                payload["expected_exists"] = expected_exists
+            return True, payload, ""
+
+        if tool == "edit_file":
+            ok, norm, err = self._validate_path_value(cleaned.get("path"), allow_dot=False)
+            if not ok:
+                return False, {}, err
+            old_text = cleaned.get("old_text")
+            new_text = cleaned.get("new_text")
+            if not isinstance(old_text, str) or not isinstance(new_text, str):
+                return False, {}, "old_text and new_text must be strings"
+            expected_sha256 = cleaned.get("expected_sha256")
+            if expected_sha256 is not None and not isinstance(expected_sha256, str):
+                return False, {}, "expected_sha256 must be a string"
+            expected_exists = cleaned.get("expected_exists")
+            if expected_exists is not None and not isinstance(expected_exists, bool):
+                return False, {}, "expected_exists must be a boolean"
+            payload = {"path": norm, "old_text": old_text, "new_text": new_text}
+            if expected_sha256 is not None:
+                payload["expected_sha256"] = expected_sha256
+            if expected_exists is not None:
+                payload["expected_exists"] = expected_exists
+            return True, payload, ""
+
+        if tool == "delete_file":
+            ok, norm, err = self._validate_path_value(cleaned.get("path"), allow_dot=False)
+            if not ok:
+                return False, {}, err
+            expected_sha256 = cleaned.get("expected_sha256")
+            if expected_sha256 is not None and not isinstance(expected_sha256, str):
+                return False, {}, "expected_sha256 must be a string"
+            expected_exists = cleaned.get("expected_exists")
+            if expected_exists is not None and not isinstance(expected_exists, bool):
+                return False, {}, "expected_exists must be a boolean"
+            payload = {"path": norm}
+            if expected_sha256 is not None:
+                payload["expected_sha256"] = expected_sha256
+            if expected_exists is not None:
+                payload["expected_exists"] = expected_exists
+            return True, payload, ""
+
+        if tool in {"copy_file", "move_file"}:
+            src_key = "source_path"
+            dst_key = "dest_path"
+            ok_src, src_norm, err_src = self._validate_path_value(cleaned.get(src_key), allow_dot=False)
+            if not ok_src:
+                return False, {}, f"source_path invalid: {err_src}"
+            ok_dst, dst_norm, err_dst = self._validate_path_value(cleaned.get(dst_key), allow_dot=False)
+            if not ok_dst:
+                return False, {}, f"dest_path invalid: {err_dst}"
+            expected_source_sha256 = cleaned.get("expected_source_sha256")
+            if expected_source_sha256 is not None and not isinstance(expected_source_sha256, str):
+                return False, {}, "expected_source_sha256 must be a string"
+            expected_dest_sha256 = cleaned.get("expected_dest_sha256")
+            if expected_dest_sha256 is not None and not isinstance(expected_dest_sha256, str):
+                return False, {}, "expected_dest_sha256 must be a string"
+            expected_source_exists = cleaned.get("expected_source_exists")
+            if expected_source_exists is not None and not isinstance(expected_source_exists, bool):
+                return False, {}, "expected_source_exists must be a boolean"
+            expected_dest_exists = cleaned.get("expected_dest_exists")
+            if expected_dest_exists is not None and not isinstance(expected_dest_exists, bool):
+                return False, {}, "expected_dest_exists must be a boolean"
+            payload = {src_key: src_norm, dst_key: dst_norm}
+            if expected_source_sha256 is not None:
+                payload["expected_source_sha256"] = expected_source_sha256
+            if expected_dest_sha256 is not None:
+                payload["expected_dest_sha256"] = expected_dest_sha256
+            if expected_source_exists is not None:
+                payload["expected_source_exists"] = expected_source_exists
+            if expected_dest_exists is not None:
+                payload["expected_dest_exists"] = expected_dest_exists
+            return True, payload, ""
+
+        if tool == "git":
+            cmd = cleaned.get("cmd")
+            if not isinstance(cmd, str) or not cmd.strip():
+                return False, {}, "cmd must be a non-empty string"
+            return True, {"cmd": cmd}, ""
+
+        if tool == "shell":
+            command = cleaned.get("command")
+            if not isinstance(command, str) or not command.strip():
+                return False, {}, "command must be a non-empty string"
+            return True, {"command": command}, ""
+
+        if tool == "system_info":
+            info_type = cleaned.get("info_type", "disks")
+            if not isinstance(info_type, str) or not info_type.strip():
+                return False, {}, "info_type must be a string"
+            if info_type not in {"disks", "memory", "system", "processes"}:
+                return False, {}, "info_type must be one of: disks, memory, system, processes"
+            return True, {"info_type": info_type}, ""
+
+        if tool == "network_info":
+            return True, {}, ""
+
+        if tool == "db_add_connection":
+            required = ["name", "host", "database", "user", "password"]
+            for key in required:
+                if not isinstance(cleaned.get(key), str) or not cleaned[key].strip():
+                    return False, {}, f"{key} must be a non-empty string"
+            port = cleaned.get("port", 5432)
+            try:
+                port = int(port)
+            except (TypeError, ValueError):
+                return False, {}, "port must be an integer"
+            if not (1 <= port <= 65535):
+                return False, {}, "port must be in 1..65535"
+            return True, {**{k: cleaned[k] for k in required}, "port": port}, ""
+
+        if tool == "db_execute_query":
+            connection_name = cleaned.get("connection_name")
+            query = cleaned.get("query")
+            if not isinstance(connection_name, str) or not connection_name.strip():
+                return False, {}, "connection_name must be a non-empty string"
+            if not isinstance(query, str) or not query.strip():
+                return False, {}, "query must be a non-empty string"
+            params = cleaned.get("params")
+            if params is not None and not isinstance(params, list):
+                return False, {}, "params must be a list"
+            return True, {"connection_name": connection_name, "query": query, "params": params or []}, ""
+
+        if tool == "db_get_schema":
+            connection_name = cleaned.get("connection_name")
+            if not isinstance(connection_name, str) or not connection_name.strip():
+                return False, {}, "connection_name must be a non-empty string"
+            table_name = cleaned.get("table_name")
+            if table_name is not None and (not isinstance(table_name, str) or not table_name.strip()):
+                return False, {}, "table_name must be a string"
+            if table_name:
+                return True, {"connection_name": connection_name, "table_name": table_name}, ""
+            return True, {"connection_name": connection_name}, ""
+
+        if tool == "memory_init":
+            connection_name = cleaned.get("connection_name", "agent_memory")
+            if not isinstance(connection_name, str) or not connection_name.strip():
+                return False, {}, "connection_name must be a non-empty string"
+            return True, {"connection_name": connection_name}, ""
+
+        if tool == "memory_search":
+            session_id = cleaned.get("session_id")
+            query = cleaned.get("query")
+            if not isinstance(session_id, str) or not session_id.strip():
+                return False, {}, "session_id must be a non-empty string"
+            if not isinstance(query, str) or not query.strip():
+                return False, {}, "query must be a non-empty string"
+            limit = cleaned.get("limit", 20)
+            try:
+                limit = int(limit)
+            except (TypeError, ValueError):
+                return False, {}, "limit must be an integer"
+            if not (1 <= limit <= 100):
+                return False, {}, "limit must be in 1..100"
+            return True, {"session_id": session_id, "query": query, "limit": limit}, ""
+
+        return False, {}, "unsupported tool"
+
+    def _validate_tool_calls(self, calls: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        valid_calls: List[Dict[str, Any]] = []
+        invalid_results: List[Dict[str, Any]] = []
+
+        for call in calls:
+            tool = call.get("tool")
+            args = call.get("args", {})
+            ok, cleaned, err = self._validate_tool_args(tool, args)
+            if ok:
+                valid_calls.append({"tool": tool, "args": cleaned})
+            else:
+                invalid_results.append(
+                    {
+                        "tool": tool or "unknown",
+                        "success": False,
+                        "error": f"Invalid tool args: {err}",
+                        "args": args,
+                    }
+                )
+
+        return valid_calls, invalid_results
+
+    def _build_dry_run_calls(self, calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        preview_calls: List[Dict[str, Any]] = []
+        for call in calls:
+            tool = call.get("tool")
+            if tool in self.PREVIEW_TOOLS:
+                args = dict(call.get("args", {}))
+                args["dry_run"] = True
+                preview_calls.append({"tool": tool, "args": args})
+        return preview_calls
+
+    def _normalize_match_path(self, value: Optional[str]) -> str:
+        if not value:
+            return ""
+        return str(value).replace("\\", "/").strip("/")
+
+    def _path_matches(self, preview_path: Optional[str], call_path: Optional[str]) -> bool:
+        if not preview_path or not call_path:
+            return False
+        preview_norm = self._normalize_match_path(preview_path)
+        call_norm = self._normalize_match_path(call_path)
+        return preview_norm.endswith(call_norm)
+
+    def _find_preview_result(
+        self,
+        tool: str,
+        args: Dict[str, Any],
+        dry_run_results: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        for item in dry_run_results:
+            if item.get("tool") != tool or not item.get("success", False):
+                continue
+            result = item.get("result", {}) or {}
+            if tool in {"write_file", "edit_file", "delete_file"}:
+                preview_path = result.get("path_relative") or result.get("path")
+                if self._path_matches(preview_path, args.get("path")):
+                    return result
+            else:
+                preview_src = result.get("source_relative") or result.get("source")
+                preview_dst = result.get("dest_relative") or result.get("dest")
+                if self._path_matches(preview_src, args.get("source_path")) and self._path_matches(
+                    preview_dst, args.get("dest_path")
+                ):
+                    return result
+        return None
+
+    def _attach_expectations(
+        self, calls: List[Dict[str, Any]], dry_run_results: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        updated: List[Dict[str, Any]] = []
+        errors: List[Dict[str, Any]] = []
+        for call in calls:
+            tool = call.get("tool")
+            args = dict(call.get("args", {}))
+            if tool not in self.PREVIEW_TOOLS:
+                updated.append(call)
+                continue
+
+            preview = self._find_preview_result(tool, args, dry_run_results)
+            if not preview:
+                errors.append({"tool": tool or "unknown", "success": False, "error": "Dry-run preview missing"})
+                continue
+
+            if tool in {"write_file", "edit_file", "delete_file"}:
+                if "sha256" in preview:
+                    args["expected_sha256"] = preview.get("sha256")
+                if "exists" in preview:
+                    args["expected_exists"] = preview.get("exists")
+            else:
+                if "source_sha256" in preview:
+                    args["expected_source_sha256"] = preview.get("source_sha256")
+                if "dest_sha256" in preview:
+                    args["expected_dest_sha256"] = preview.get("dest_sha256")
+                if "source_exists" in preview:
+                    args["expected_source_exists"] = preview.get("source_exists")
+                if "dest_exists" in preview:
+                    args["expected_dest_exists"] = preview.get("dest_exists")
+
+            updated.append({"tool": tool, "args": args})
+
+        return updated, errors
+
+    def _looks_like_tool_calls(self, text: str) -> bool:
+        return "TOOL_CALL" in text
+
+    def _find_json_block(self, text: str, marker: str, open_char: str, close_char: str) -> Optional[str]:
+        """Find a JSON-like block after marker, handling nested braces and quoted strings."""
+        start_marker = text.find(marker)
+        if start_marker == -1:
+            return None
+
+        start = text.find(open_char, start_marker)
+        if start == -1:
+            return None
+
+        depth = 0
+        in_str = False
+        escape = False
+
+        for i in range(start, len(text)):
+            ch = text[i]
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+                continue
+
+            if ch == '"':
+                in_str = True
+                continue
+            if ch == open_char:
+                depth += 1
+                continue
+            if ch == close_char:
+                depth -= 1
+                if depth == 0:
+                    return text[start : i + 1]
+
+        return None
+
+    def _parse_tool_calls_payload(self, payload: str) -> List[Dict[str, Any]]:
+        parsed = None
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                parsed = parser(payload)
+                break
+            except Exception:
+                continue
+
+        if parsed is None:
+            return []
+
+        if isinstance(parsed, dict):
+            return [parsed]
+        if isinstance(parsed, list):
+            return parsed
+        return []
 
     def _extract_tool_calls(self, text: str) -> List[Dict[str, Any]]:
         calls: List[Dict[str, Any]] = []
 
-        array_match = re.search(r"TOOL_CALLS:\s*(\[[\s\S]+?\])", text)
-        if array_match:
-            try:
-                parsed = json.loads(array_match.group(1))
-                if isinstance(parsed, list):
-                    calls.extend(parsed)
-            except json.JSONDecodeError:
-                pass
+        array_block = self._find_json_block(text, "TOOL_CALLS", "[", "]")
+        if array_block:
+            calls.extend(self._parse_tool_calls_payload(array_block))
 
-        if not calls:
-            for match in re.finditer(r"TOOL_CALL:\s*({[\s\S]+?})", text):
-                try:
-                    parsed = json.loads(match.group(1))
-                    if isinstance(parsed, dict):
-                        calls.append(parsed)
-                except json.JSONDecodeError:
-                    continue
+        if not calls and "TOOL_CALL:" in text:
+            search_from = 0
+            while True:
+                idx = text.find("TOOL_CALL:", search_from)
+                if idx == -1:
+                    break
+                block = self._find_json_block(text[idx:], "TOOL_CALL:", "{", "}")
+                if block:
+                    calls.extend(self._parse_tool_calls_payload(block))
+                search_from = idx + len("TOOL_CALL:")
 
-        cleaned = []
+        cleaned: List[Dict[str, Any]] = []
         for call in calls:
             if not isinstance(call, dict):
                 continue
             tool = call.get("tool")
             args = call.get("args", {})
-            if tool in TOOL_SPECS and isinstance(args, dict):
-                cleaned.append({"tool": tool, "args": args})
+            if not isinstance(tool, str) or not tool.strip():
+                continue
+            if args is None:
+                args = {}
+            if not isinstance(args, dict):
+                continue
+            cleaned.append({"tool": tool.strip(), "args": args})
 
         return cleaned[:5]
+
+    _TOOL_ALIASES = {
+        # Model-friendly aliases -> supported tools (read-only conversions only).
+        "locate_file": "search",
+        "find_file": "search",
+        "find_files": "search",
+        "grep": "search",
+        "ripgrep": "search",
+        "rg": "search",
+    }
+
+    def _extract_named_file_target(self, task: str) -> Optional[str]:
+        """Extract a single explicit filename target from common prompts (English/RU)."""
+        if not isinstance(task, str) or not task.strip():
+            return None
+
+        patterns = [
+            r"\bcreate a file named\s+([^\s\"']+)\b",
+            r"\bcreate a file called\s+([^\s\"']+)\b",
+            r"\bcreate file\s+([^\s\"']+)\b",
+            r"\bсоздай файл\s+([^\s\"']+)\b",
+            r"\bсоздать файл\s+([^\s\"']+)\b",
+        ]
+        matches: List[str] = []
+        for pattern in patterns:
+            for match in re.finditer(pattern, task, flags=re.IGNORECASE):
+                candidate = match.group(1).strip().strip(".,;:")
+                if candidate:
+                    matches.append(candidate)
+        if len(matches) != 1:
+            return None
+        return matches[0]
+
+    def _extract_filename_token(self, task: str) -> Optional[str]:
+        """Extract a filename token when only the name (no path) is mentioned."""
+        if not isinstance(task, str) or not task.strip():
+            return None
+        match = re.search(
+            r"\b[\w.-]+\.(py|js|ts|md|yml|yaml|json|toml|ini|conf|env|sh|ps1)\b",
+            task,
+        )
+        if not match:
+            return None
+        token = match.group(0)
+        if "/" in token or "\\" in token:
+            return None
+        return token
+
+    def _derive_search_query(self, task: str) -> Optional[str]:
+        if not isinstance(task, str):
+            return None
+        lowered = task.lower()
+        has_todo = "todo" in lowered
+        has_fixme = "fixme" in lowered
+        if has_todo and has_fixme:
+            return "TODO|FIXME"
+        if has_todo:
+            return "TODO"
+        if has_fixme:
+            return "FIXME"
+        return None
+
+    def _default_search_query_for_task(self, task: str) -> Optional[str]:
+        token = self._extract_filename_token(task)
+        if token:
+            return token
+        derived = self._derive_search_query(task)
+        if derived:
+            return derived
+        if not isinstance(task, str):
+            return None
+        lowered = task.lower()
+        if "proxy_pass" in lowered:
+            return "proxy_pass"
+        if "ports:" in lowered:
+            return "ports:"
+        if re.search(r"\bports?\b", lowered) or re.search(r"\bport\s+\\d+\b", lowered):
+            return "ports"
+        if re.search(r"\b(порт|порты|проброшен|проброс)\b", lowered):
+            return "ports"
+        if "nginx" in lowered:
+            return "nginx.conf"
+        if "docker-compose" in lowered or ("docker" in lowered and "compose" in lowered):
+            return "docker-compose.yml"
+        env_match = re.search(r"\b[A-Z][A-Z0-9_]{2,}\b", task)
+        if env_match:
+            return env_match.group(0)
+        return None
+
+    def _fallback_search_queries(self, task: str, current_query: Optional[str]) -> List[str]:
+        queries: List[str] = []
+        if isinstance(task, str):
+            if "/v1" in task:
+                queries.append("/v1")
+            if "/tools" in task:
+                queries.append("/tools")
+        default = self._default_search_query_for_task(task)
+        if default:
+            queries.append(default)
+        deduped: List[str] = []
+        for query in queries:
+            if query and query != current_query and query not in deduped:
+                deduped.append(query)
+        return deduped
+
+    def _should_use_search_then_read_top_n(self, task: str) -> bool:
+        if not isinstance(task, str) or not task.strip():
+            return False
+        lower = task.lower()
+        if "todo" in lower or "fixme" in lower:
+            return True
+        if "proxy_pass" in lower:
+            return True
+        if "ports:" in lower or re.search(r"\bports?\b", lower):
+            return True
+        if re.search(r"\b(порт|порты|проброшен|проброс)\b", lower):
+            return True
+
+        token = self._default_search_query_for_task(task)
+        if token and re.match(r"^[A-Z][A-Z0-9_]{2,}$", token):
+            if re.search(r"\b(used|usage|where)\b", lower) or re.search(r"\b(где|использ)\w*\b", lower):
+                return True
+        return False
+
+    def _is_sensitive_path_for_evidence(self, path: str) -> bool:
+        if not isinstance(path, str) or not path.strip():
+            return True
+        value = path.strip().replace("\\", "/").lower()
+        if value in {".env"} or value.endswith("/.env"):
+            return True
+        if value.endswith((".key", ".pem", ".p12", ".pfx")):
+            return True
+        if value.endswith(("id_rsa", "id_ed25519")):
+            return True
+        if value.endswith((".safetensors", ".gguf", ".bin")):
+            return True
+        return False
+
+    def _evidence_search_globs(self, task: str, query: str) -> Optional[List[str]]:
+        if not isinstance(task, str) or not isinstance(query, str):
+            return None
+        lower = task.lower()
+        q = query.lower()
+        if q in {"proxy_pass"} or "nginx" in lower:
+            return ["nginx*.conf", "**/*.conf"]
+        if q.startswith("ports") or "docker-compose" in lower or "compose" in lower:
+            return ["docker-compose*.yml", "docker-compose*.yaml"]
+        if q in {"todo", "fixme", "todo|fixme"}:
+            return None
+        if re.match(r"^[A-Z][A-Z0-9_]{2,}$", query):
+            return ["**/*.py", "**/*.yml", "**/*.yaml", "**/*.md", "**/*.env.example", "Dockerfile"]
+        return None
+
+    def _evidence_file_sort_key(self, task: str, query: str, path: str) -> Tuple[int, str]:
+        p = (path or "").replace("\\", "/").lower()
+        score = 0
+        q = (query or "").lower()
+        lower = (task or "").lower()
+
+        if q == "proxy_pass" or "nginx" in lower:
+            if p in {"nginx.conf", "nginx-https-local.conf", "nginx-https.conf"}:
+                score -= 20
+            elif p.startswith("nginx") and p.endswith(".conf"):
+                score -= 10
+            elif "nginx" in p and p.endswith(".conf"):
+                score -= 6
+            elif p.endswith(".conf"):
+                score -= 2
+
+        if q.startswith("ports") or "docker-compose" in lower or "compose" in lower:
+            if p == "docker-compose.yml":
+                score -= 20
+            elif p.startswith("docker-compose"):
+                score -= 10
+            elif p.endswith((".yml", ".yaml")):
+                score -= 2
+
+        if re.match(r"^[A-Z][A-Z0-9_]{2,}$", query):
+            if p in {"docker-compose.yml", "docker-compose-prod.yml", ".env.example"}:
+                score -= 10
+            elif p.startswith("docker-compose"):
+                score -= 6
+            elif p.startswith("agent_runtime/orchestrator/"):
+                score -= 4
+            elif p.endswith(".py"):
+                score -= 2
+
+        return (score, p)
+
+    _SENSITIVE_KV_KEYS = re.compile(r"(api[_-]?key|token|secret|password|passwd|pass|private[_-]?key)", re.IGNORECASE)
+
+    def _redact_sensitive_line(self, line: str) -> str:
+        if not isinstance(line, str) or not line:
+            return ""
+
+        # Redact any literal OpenAI-style key fragments.
+        line = re.sub(r"sk-[A-Za-z0-9_-]+", "[REDACTED]", line)
+
+        # Redact private key blocks lines (full block handling happens in `_redact_sensitive_text`).
+        if "BEGIN PRIVATE KEY" in line or "BEGIN RSA PRIVATE KEY" in line:
+            return "[REDACTED PRIVATE KEY BLOCK]"
+
+        # Key-value patterns like FOO=bar or FOO: bar.
+        kv = re.match(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*[:=]\s*)(.*)$", line)
+        if kv:
+            key = kv.group(2)
+            value = kv.group(4)
+            if self._SENSITIVE_KV_KEYS.search(key):
+                stripped = value.strip()
+                # Keep env references like ${VAR} / ${VAR:-default}.
+                if stripped.startswith("${"):
+                    return line
+                # Use ":" to avoid leaking "KEY=" patterns in evidence output.
+                return f"{kv.group(1)}{key}: [REDACTED]"
+
+        # Authorization headers
+        line = re.sub(r"(?i)(authorization\s*:\s*bearer\s+)(\S+)", r"\1[REDACTED]", line)
+        # Also remove the Bearer scheme word to avoid leaking it verbatim in evidence output.
+        line = re.sub(r"(?i)\bbearer\b", "[REDACTED_SCHEME]", line)
+        return line
+
+    def _redact_sensitive_text(self, text: str) -> str:
+        if not isinstance(text, str) or not text:
+            return ""
+        lines: List[str] = []
+        in_key_block = False
+        for raw in text.splitlines():
+            line = raw
+            if re.search(r"-----BEGIN (RSA )?PRIVATE KEY-----", line):
+                in_key_block = True
+                lines.append("[REDACTED PRIVATE KEY BLOCK]")
+                continue
+            if in_key_block:
+                if re.search(r"-----END (RSA )?PRIVATE KEY-----", line):
+                    in_key_block = False
+                continue
+            lines.append(self._redact_sensitive_line(line))
+        return "\n".join(lines)
+
+    def _format_evidence_block(
+        self,
+        query: str,
+        search_payload: Dict[str, Any],
+        tool_results: List[Dict[str, Any]],
+        read_results: List[Dict[str, Any]],
+        max_lines: int,
+        fallback_used: bool,
+        skipped_files: Optional[List[str]] = None,
+    ) -> str:
+        max_total_chars = int(os.getenv("EVIDENCE_MAX_CHARS", "60000"))
+
+        lines: List[str] = []
+        lines.append("=== Evidence (tool output) ===")
+        lines.append(f"query: {query}")
+        if fallback_used:
+            lines.append("search: fallback globs used")
+
+        errors: List[str] = []
+        for item in tool_results:
+            tool = item.get("tool") or "tool"
+            if item.get("success"):
+                continue
+            payload = item.get("result")
+            if isinstance(payload, dict):
+                detail = payload.get("detail") or payload.get("error")
+                if isinstance(detail, str) and detail.strip():
+                    errors.append(f"{tool}: {detail.strip()}")
+                    continue
+            error_text = item.get("error")
+            if isinstance(error_text, str) and error_text.strip():
+                errors.append(f"{tool}: {error_text.strip()}")
+        if errors:
+            lines.append("")
+            lines.append("--- errors ---")
+            lines.extend(errors[:10])
+
+        count = search_payload.get("count")
+        match_count = search_payload.get("match_count")
+        if isinstance(count, int):
+            lines.append(f"files_found: {count}")
+        if isinstance(match_count, int):
+            lines.append(f"matches_found: {match_count}")
+
+        if skipped_files:
+            listed = [f for f in skipped_files if isinstance(f, str)]
+            if listed:
+                lines.append("")
+                lines.append("--- skipped (sensitive) ---")
+                lines.extend(listed[:10])
+
+        matches = search_payload.get("matches")
+        if isinstance(matches, list) and matches:
+            lines.append("")
+            lines.append("--- matches (top) ---")
+            shown = 0
+            for match in matches:
+                if not isinstance(match, dict):
+                    continue
+                path = match.get("path")
+                line_no = match.get("line")
+                text = match.get("text")
+                if not isinstance(path, str):
+                    continue
+                if not isinstance(line_no, int):
+                    line_no = 0
+                if not isinstance(text, str):
+                    text = ""
+                lines.append(f"{path}:{line_no} {self._redact_sensitive_line(text)}")
+                shown += 1
+                if shown >= 40:
+                    break
+
+        for item in read_results:
+            tool = item.get("tool")
+            success = item.get("success", False)
+            payload = item.get("result") or {}
+            if tool != "read_file" or not success or not isinstance(payload, dict):
+                continue
+            path = payload.get("path_relative") or payload.get("path") or "unknown"
+            content = payload.get("content") or ""
+            if not isinstance(content, str):
+                continue
+            redacted = self._redact_sensitive_text(content)
+            raw_lines = redacted.splitlines()
+            snippet_lines = raw_lines[:max_lines]
+            trimmed_lines: List[str] = []
+            for line in snippet_lines:
+                if len(line) > 250:
+                    trimmed_lines.append(line[:250] + "…[TRUNCATED]")
+                else:
+                    trimmed_lines.append(line)
+            snippet = "\n".join(trimmed_lines)
+            truncated = len(raw_lines) > max_lines
+            lines.append("")
+            header = f"--- file: {path} (first {max_lines} lines){' [TRUNCATED]' if truncated else ''} ---"
+
+            current_len = sum(len(l) + 1 for l in lines)
+            projected = current_len + len(header) + 1 + len(snippet) + 1
+            if projected > max_total_chars:
+                remaining = max_total_chars - current_len - len(header) - 1 - len("\n...[EVIDENCE TRUNCATED]...\n")
+                if remaining <= 0:
+                    lines.append("...[EVIDENCE TRUNCATED]...")
+                    break
+                lines.append(header)
+                lines.append(snippet[:remaining].rstrip() + "\n...[EVIDENCE TRUNCATED]...")
+                break
+
+            lines.append(header)
+            lines.append(snippet)
+
+        return "\n".join(lines).strip()
+
+    def search_then_read_top_n(
+        self,
+        task: str,
+        query: Optional[str] = None,
+        top_n: int = 5,
+        max_lines: int = 200,
+    ) -> Dict[str, Any]:
+        query_value = (query or self._default_search_query_for_task(task) or "").strip()
+        if not query_value:
+            return {
+                "success": False,
+                "tool_calls": [],
+                "tool_results": [],
+                "evidence": "=== Evidence (tool output) ===\nerror: unable to derive search query",
+            }
+
+        globs = self._evidence_search_globs(task, query_value)
+        search_args: Dict[str, Any] = {"query": query_value}
+        if globs:
+            search_args["globs"] = globs
+        search_calls = [{"tool": "search", "args": search_args}]
+        search_results = self._execute_tool_calls(search_calls)
+        search_payload: Dict[str, Any] = {}
+        files: List[str] = []
+        fallback_used = False
+        if search_results and search_results[0].get("success") and isinstance(search_results[0].get("result"), dict):
+            search_payload = search_results[0]["result"]
+            files = search_payload.get("files") or []
+            if not isinstance(files, list):
+                files = []
+
+        if not files:
+            fallback_used = True
+            fallback_globs = [
+                "docker-compose*.yml",
+                "nginx*.conf",
+                "**/*.env",
+                "agent_runtime/orchestrator/agent.py",
+            ]
+            fallback_calls = [{"tool": "search", "args": {"query": query_value, "globs": fallback_globs}}]
+            search_results = self._execute_tool_calls(fallback_calls)
+            search_calls = fallback_calls
+            if search_results and search_results[0].get("success") and isinstance(search_results[0].get("result"), dict):
+                search_payload = search_results[0]["result"]
+                files = search_payload.get("files") or []
+                if not isinstance(files, list):
+                    files = []
+
+        files = [f for f in files if isinstance(f, str)]
+        files.sort(key=lambda p: self._evidence_file_sort_key(task, query_value, p))
+        selected_files: List[str] = []
+        skipped_files: List[str] = []
+        for path in files:
+            if len(selected_files) >= max(1, top_n):
+                break
+            if self._is_sensitive_path_for_evidence(path):
+                skipped_files.append(path)
+                continue
+            selected_files.append(path)
+        top_files = selected_files
+        read_calls = [{"tool": "read_file", "args": {"path": path}} for path in top_files]
+        read_results = self._execute_tool_calls(read_calls) if read_calls else []
+        tool_results = search_results + read_results
+        evidence = self._format_evidence_block(
+            query=query_value,
+            search_payload=search_payload if isinstance(search_payload, dict) else {},
+            tool_results=tool_results,
+            read_results=read_results,
+            max_lines=max_lines,
+            fallback_used=fallback_used,
+            skipped_files=skipped_files,
+        )
+        return {"success": True, "tool_calls": search_calls + read_calls, "tool_results": tool_results, "evidence": evidence}
+
+    def _apply_tool_arg_fallbacks(self, task: str, calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not calls:
+            return calls
+        query = self._default_search_query_for_task(task)
+        file_token = self._extract_filename_token(task)
+        updated: List[Dict[str, Any]] = []
+        for call in calls:
+            if not isinstance(call, dict):
+                continue
+            tool = call.get("tool")
+            args = call.get("args")
+            if not isinstance(args, dict):
+                args = {}
+            if tool == "search":
+                current = args.get("query")
+                if not isinstance(current, str) or not current.strip():
+                    if query:
+                        args["query"] = query
+            elif tool == "read_file":
+                current = args.get("path")
+                if not isinstance(current, str) or not current.strip():
+                    if file_token:
+                        args["path"] = file_token
+            call["args"] = args
+            updated.append(call)
+        return updated
+
+    def _build_fallback_tool_calls(self, task: str, required: List[str]) -> List[Dict[str, Any]]:
+        calls: List[Dict[str, Any]] = []
+        query = self._default_search_query_for_task(task)
+        if "search" in required and query:
+            calls.append({"tool": "search", "args": {"query": query}})
+        if "read_file" in required and "search" not in required:
+            token = self._extract_filename_token(task)
+            if token:
+                calls.append({"tool": "read_file", "args": {"path": token}})
+        return calls
+
+    def _normalize_tool_calls(self, task: str, calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Normalize tool calls for better reliability (safe, deterministic transforms)."""
+        target_file = self._extract_named_file_target(task)
+        normalized: List[Dict[str, Any]] = []
+
+        for call in calls:
+            if not isinstance(call, dict):
+                continue
+            tool = call.get("tool")
+            args = call.get("args") or {}
+            if not isinstance(tool, str) or not isinstance(args, dict):
+                normalized.append(call)
+                continue
+
+            tool_name = tool.strip()
+            tool_key = tool_name.lower()
+
+            # Apply safe aliases (read-only only).
+            if tool_name not in TOOL_SPECS:
+                alias = self._TOOL_ALIASES.get(tool_key)
+                if alias == "search":
+                    query = args.get("query")
+                    if not isinstance(query, str) or not query.strip():
+                        query = args.get("path") if isinstance(args.get("path"), str) else ""
+                    if not query:
+                        query = self._default_search_query_for_task(task) or ""
+                    new_args: Dict[str, Any] = {"query": query}
+                    globs = args.get("globs")
+                    if isinstance(globs, list):
+                        new_args["globs"] = globs
+                    normalized.append({"tool": "search", "args": new_args})
+                    continue
+
+            # Fill missing args for safe read-only calls.
+            if tool_name == "search":
+                query = args.get("query")
+                if not isinstance(query, str) or not query.strip():
+                    derived = self._default_search_query_for_task(task)
+                    if derived:
+                        new_args = dict(args)
+                        new_args["query"] = derived
+                        normalized.append({"tool": tool_name, "args": new_args})
+                        continue
+
+            # If task clearly names a target file, prevent (or correct) mismatched writes.
+            if target_file and tool_name == "write_file":
+                path = args.get("path")
+                if isinstance(path, str) and path.strip() and path.strip() != target_file:
+                    new_args = dict(args)
+                    new_args["path"] = target_file
+                    normalized.append({"tool": tool_name, "args": new_args})
+                    continue
+
+            normalized.append({"tool": tool_name, "args": args})
+
+        return normalized
+
+    def _repair_tool_calls(self, text: str) -> Optional[str]:
+        """Ask the model to re-emit valid TOOL_CALLS JSON if parsing failed."""
+        if not self._looks_like_tool_calls(text):
+            return None
+
+        system = (
+            "You must output ONLY valid TOOL_CALLS JSON. "
+            "Do not include any other text. Use this exact format:\n"
+            "TOOL_CALLS: [{\"tool\": \"name\", \"args\": {...}}]"
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Fix this into valid TOOL_CALLS JSON:\n{text}"},
+        ]
+        try:
+            return self._call_llm(messages, max_tokens=200)
+        except Exception:
+            return None
 
     def _tool_call_requires_confirmation(self, call: Dict[str, Any]) -> bool:
         tool = call.get("tool")
@@ -490,8 +1479,10 @@ class Agent:
             return not query.startswith(READ_ONLY_SQL_PREFIXES)
         return True
 
-    def _execute_tool_calls(self, calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        results = []
+    def _execute_tool_calls(
+        self, calls: List[Dict[str, Any]], invalid_results: Optional[List[Dict[str, Any]]] = None
+    ) -> List[Dict[str, Any]]:
+        results = list(invalid_results or [])
         for call in calls:
             tool = call.get("tool")
             args = call.get("args", {})
@@ -516,45 +1507,283 @@ class Agent:
         lines = []
         for item in results:
             tool = item.get("tool")
+            success = item.get("success", False)
             payload = item.get("result") or {"error": item.get("error")}
+
+            if tool == "read_file" and success and isinstance(payload, dict):
+                path = payload.get("path_relative") or payload.get("path") or "unknown"
+                content = payload.get("content", "")
+                if isinstance(content, str):
+                    if len(content) > 6000:
+                        content = content[:6000] + "\n...[TRUNCATED]..."
+                    lines.append(f"read_file ({path}):\n{content}")
+                    continue
+
+            if tool == "search" and success and isinstance(payload, dict):
+                files = payload.get("files")
+                if isinstance(files, list) and files:
+                    listed = "\n".join(f"- {f}" for f in files[:20])
+                    lines.append("search results:\n" + listed)
+                    continue
+
             payload_text = json.dumps(payload, ensure_ascii=True)[:2000]
-            lines.append(f"{tool}: {payload_text}")
+            status = "ok" if success else "error"
+            lines.append(f"{tool} ({status}): {payload_text}")
         return "\n".join(lines)
+
+    def _tool_focus_instructions(self, task: str) -> str:
+        lower = task.lower()
+        if "docker-compose" in lower or "compose" in lower:
+            return "Answer the question using exact port mappings from docker-compose.yml."
+        if "nginx" in lower:
+            return "Name the file and the exact location blocks for /v1 and /tools."
+        if "agent_llm_url" in lower:
+            return "List files and describe how AGENT_LLM_URL is used in each."
+        if "todo" in lower or "fixme" in lower:
+            return "List file:line hits from search results."
+        return "Use tool results only; do not guess."
 
     def _finalize_with_tool_results(
         self, messages: List[Dict[str, str]], first_response: str, results: List[Dict[str, Any]]
     ) -> str:
         tool_summary = self._format_tool_results(results)
+        task_text = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                task_text = msg.get("content", "") or ""
+                break
+        focus = self._tool_focus_instructions(task_text)
         messages_pass2 = [
             *messages,
             {"role": "assistant", "content": first_response},
             {"role": "system", "content": "Tool results:\n" + tool_summary},
+            {"role": "system", "content": "Use tool results only. " + focus},
             {"role": "user", "content": "Provide the final answer. Do not request more tools."},
         ]
-        return self._call_llm(messages_pass2)
+        final = self._call_llm(messages_pass2)
+        if self._extract_tool_calls(final):
+            messages_pass3 = [
+                *messages_pass2,
+                {"role": "assistant", "content": final},
+                {"role": "system", "content": "Tool calls are NOT allowed now. Respond with the final answer only."},
+            ]
+            retry = self._call_llm(messages_pass3)
+            if not self._extract_tool_calls(retry):
+                return retry
+            return "Final response blocked: model kept requesting tools after results."
+        return final
 
     def think_with_tools(self, task: str, require_confirmation: bool = True) -> Dict[str, Any]:
-        messages = self._build_tool_messages(task)
+        if self._should_use_search_then_read_top_n(task):
+            evidence = self.search_then_read_top_n(task)
+            return {
+                "status": "final",
+                "response": evidence.get("evidence", ""),
+                "tool_calls": evidence.get("tool_calls", []),
+                "tool_results": evidence.get("tool_results", []),
+            }
+
+        required_tools = self._required_tools_for_task(task)
+        messages = self._build_tool_messages(task, required_tools=required_tools)
         first = self._call_llm(messages)
 
-        tool_calls = self._extract_tool_calls(first)
+        def _extract_calls(text: str) -> Tuple[str, List[Dict[str, Any]]]:
+            calls = self._normalize_tool_calls(task, self._extract_tool_calls(text))
+            if not calls and self._looks_like_tool_calls(text):
+                repaired = self._repair_tool_calls(text)
+                if repaired:
+                    repaired_calls = self._normalize_tool_calls(task, self._extract_tool_calls(repaired))
+                    if repaired_calls:
+                        return repaired, repaired_calls
+            return text, calls
+
+        first, tool_calls = _extract_calls(first)
+
+        if required_tools:
+            missing = self._missing_required_tools(tool_calls, required_tools)
+            if missing:
+                forced_messages = self._build_tool_messages(task, required_tools=required_tools, force_tools=True)
+                forced = self._call_llm(forced_messages)
+                forced, tool_calls = _extract_calls(forced)
+                missing = self._missing_required_tools(tool_calls, required_tools)
+                if missing:
+                    fallback_calls = self._build_fallback_tool_calls(task, required_tools)
+                    if fallback_calls:
+                        tool_calls = fallback_calls
+                        first = forced
+                    else:
+                        return {
+                            "status": "final",
+                            "response": f"Tool use required: {', '.join(missing)}.",
+                            "tool_calls": [],
+                        }
+                else:
+                    first = forced
+
+        tool_calls = self._apply_tool_arg_fallbacks(task, tool_calls)
+
+        file_token = self._extract_filename_token(task)
+        if file_token:
+            for call in tool_calls:
+                if call.get("tool") == "search":
+                    args = call.get("args") or {}
+                    if isinstance(args, dict):
+                        args = dict(args)
+                        args["query"] = file_token
+                        call["args"] = args
+
         if not tool_calls:
             return {"status": "final", "response": first, "tool_calls": []}
 
-        if require_confirmation and any(self._tool_call_requires_confirmation(c) for c in tool_calls):
+        valid_calls, invalid_results = self._validate_tool_calls(tool_calls)
+        if not valid_calls and invalid_results:
+            # One more repair pass for common failure modes: unknown tool names / missing required args.
+            repaired = self._repair_tool_calls(first)
+            if repaired and repaired != first:
+                repaired_calls = self._normalize_tool_calls(task, self._extract_tool_calls(repaired))
+                if repaired_calls:
+                    repaired_valid, repaired_invalid = self._validate_tool_calls(repaired_calls)
+                    if repaired_valid:
+                        first = repaired
+                        tool_calls = repaired_calls
+                        valid_calls, invalid_results = repaired_valid, repaired_invalid
+
+            if not valid_calls and invalid_results:
+                return {
+                    "status": "final",
+                    "response": f"Invalid tool call(s): {', '.join(r['error'] for r in invalid_results)}",
+                    "tool_calls": [],
+                    "tool_results": invalid_results,
+                }
+
+        search_first = "search" in required_tools and "read_file" in required_tools
+        if search_first:
+            search_calls = [c for c in valid_calls if c.get("tool") == "search"]
+            other_calls = [c for c in valid_calls if c.get("tool") not in {"search", "read_file"}]
+            search_results = self._execute_tool_calls(search_calls)
+
+            allowed_paths: List[str] = []
+            for item in search_results:
+                payload = item.get("result") or {}
+                files = payload.get("files") or []
+                if isinstance(files, list):
+                    allowed_paths.extend([f for f in files if isinstance(f, str)])
+            allowed_paths = list(dict.fromkeys(allowed_paths))
+
+            if not allowed_paths:
+                current_query = None
+                if search_calls:
+                    current_args = search_calls[0].get("args")
+                    if isinstance(current_args, dict):
+                        value = current_args.get("query")
+                        if isinstance(value, str):
+                            current_query = value
+                for fallback_query in self._fallback_search_queries(task, current_query):
+                    fallback_calls = [{"tool": "search", "args": {"query": fallback_query}}]
+                    fallback_results = self._execute_tool_calls(fallback_calls)
+                    fallback_paths: List[str] = []
+                    for item in fallback_results:
+                        payload = item.get("result") or {}
+                        files = payload.get("files") or []
+                        if isinstance(files, list):
+                            fallback_paths.extend([f for f in files if isinstance(f, str)])
+                    fallback_paths = list(dict.fromkeys(fallback_paths))
+                    if fallback_paths:
+                        search_calls = fallback_calls
+                        search_results = fallback_results
+                        allowed_paths = fallback_paths
+                        break
+            if not allowed_paths:
+                return {
+                    "status": "final",
+                    "response": "Search returned no files to read. Refine the query.",
+                    "tool_calls": search_calls,
+                    "tool_results": search_results + list(invalid_results or []),
+                }
+
+            if file_token and file_token in allowed_paths:
+                read_calls = [{"tool": "read_file", "args": {"path": file_token}}]
+                read_results = self._execute_tool_calls(read_calls)
+                tool_results = search_results + read_results + list(invalid_results or [])
+                if other_calls:
+                    tool_results += self._execute_tool_calls(other_calls)
+                final = self._finalize_with_tool_results(messages, first, tool_results)
+                return {
+                    "status": "final",
+                    "response": final,
+                    "tool_calls": search_calls + read_calls + other_calls,
+                    "tool_results": tool_results,
+                }
+
+            max_listed = 20
+            listed = "\n".join(f"- {p}" for p in allowed_paths[:max_listed])
+            followup_messages = self._build_tool_messages(
+                task,
+                required_tools=["read_file"],
+                force_tools=True,
+            )
+            followup_messages.append(
+                {
+                    "role": "system",
+                    "content": "Search results files (use read_file only for these paths):\n" + listed,
+                }
+            )
+            followup = self._call_llm(followup_messages)
+            followup, followup_calls = _extract_calls(followup)
+
+            read_calls = [c for c in followup_calls if c.get("tool") == "read_file"]
+            if not read_calls:
+                return {
+                    "status": "final",
+                    "response": "read_file required after search. Re-run and select a file from search results.",
+                    "tool_calls": search_calls,
+                    "tool_results": search_results,
+                }
+
+            invalid_read = [
+                c for c in read_calls if c.get("args", {}).get("path") not in set(allowed_paths)
+            ]
+            if invalid_read:
+                return {
+                    "status": "final",
+                    "response": "read_file path must be selected from search results.",
+                    "tool_calls": search_calls,
+                    "tool_results": search_results,
+                }
+
+            read_results = self._execute_tool_calls(read_calls)
+            tool_results = search_results + read_results + list(invalid_results or [])
+            if other_calls:
+                tool_results += self._execute_tool_calls(other_calls)
+
+            final = self._finalize_with_tool_results(followup_messages, followup, tool_results)
+            return {
+                "status": "final",
+                "response": final,
+                "tool_calls": search_calls + read_calls + other_calls,
+                "tool_results": tool_results,
+            }
+
+        if require_confirmation and any(self._tool_call_requires_confirmation(c) for c in valid_calls):
+            dry_run_results: List[Dict[str, Any]] = []
+            preview_calls = self._build_dry_run_calls(valid_calls)
+            if preview_calls:
+                dry_run_results = self._execute_tool_calls(preview_calls)
             return {
                 "status": "confirmation_required",
                 "response": first,
-                "tool_calls": tool_calls,
+                "tool_calls": valid_calls,
                 "task": task,
+                "validation_errors": invalid_results,
+                "dry_run_results": dry_run_results,
             }
 
-        tool_results = self._execute_tool_calls(tool_calls)
+        tool_results = self._execute_tool_calls(valid_calls, invalid_results)
         final = self._finalize_with_tool_results(messages, first, tool_results)
         return {
             "status": "final",
             "response": final,
-            "tool_calls": tool_calls,
+            "tool_calls": valid_calls,
             "tool_results": tool_results,
         }
 
@@ -562,9 +1791,38 @@ class Agent:
         task = pending_action.get("task", "")
         tool_calls = pending_action.get("tool_calls", [])
         first_response = pending_action.get("response", "")
+        dry_run_results = pending_action.get("dry_run_results", []) or []
 
         messages = self._build_tool_messages(task)
-        tool_results = self._execute_tool_calls(tool_calls)
+        valid_calls, invalid_results = self._validate_tool_calls(tool_calls)
+        if not valid_calls and invalid_results:
+            return {
+                "status": "final",
+                "response": f"Invalid tool call(s): {', '.join(r['error'] for r in invalid_results)}",
+                "tool_results": invalid_results,
+            }
+        if any(call.get("tool") in self.PREVIEW_TOOLS for call in valid_calls):
+            if not dry_run_results:
+                return {
+                    "status": "final",
+                    "response": "Dry-run preview missing. Re-run the task to regenerate previews.",
+                    "tool_results": [{"success": False, "error": "Missing dry-run preview"}],
+                }
+            updated_calls, preview_errors = self._attach_expectations(valid_calls, dry_run_results)
+            if preview_errors:
+                return {
+                    "status": "final",
+                    "response": "Dry-run preview mismatch. Re-run the task to regenerate previews.",
+                    "tool_results": preview_errors,
+                }
+            valid_calls, invalid_results = self._validate_tool_calls(updated_calls)
+            if not valid_calls and invalid_results:
+                return {
+                    "status": "final",
+                    "response": f"Invalid tool call(s): {', '.join(r['error'] for r in invalid_results)}",
+                    "tool_results": invalid_results,
+                }
+        tool_results = self._execute_tool_calls(valid_calls, invalid_results)
         final = self._finalize_with_tool_results(messages, first_response, tool_results)
         return {"status": "final", "response": final, "tool_results": tool_results}
 
@@ -652,9 +1910,54 @@ class Agent:
         else:
             # Fallback: keyword detection
             lower_resp = response.lower()
-            security_kw = ["security", "vulnerability", "auth", "token", "jwt", "injection", "xss", "csrf"]
-            arch_kw = ["migration", "architecture", "scaling", "refactor", "database"]
-            incident_kw = ["incident", "outage", "breach", "attack", "production down"]
+            security_kw = [
+                "security",
+                "vulnerability",
+                "auth",
+                "token",
+                "jwt",
+                "injection",
+                "xss",
+                "csrf",
+                # RU stems
+                "безопас",
+                "уязвим",
+                "аутентиф",
+                "авторизац",
+                "токен",
+                "секрет",
+                "парол",
+                "инъекц",
+            ]
+            arch_kw = [
+                "migration",
+                "architecture",
+                "scaling",
+                "refactor",
+                "database",
+                # RU stems
+                "архитект",
+                "миграц",
+                "масштаб",
+                "рефактор",
+                "база данных",
+                "бд",
+            ]
+            incident_kw = [
+                "incident",
+                "outage",
+                "breach",
+                "attack",
+                "production down",
+                # RU stems
+                "инцидент",
+                "атака",
+                "взлом",
+                "утечк",
+                "прод упал",
+                "прод лежит",
+                "простой",
+            ]
 
             if any(kw in lower_resp for kw in security_kw + arch_kw + incident_kw):
                 needs_consilium = True
