@@ -61,7 +61,7 @@ jobs:
       - name: Decision trend gate
         run: |
           mkdir -p data/reports
-          python tools/decision_trend.py --fail-below-avg 0.6 --exclude-class legacy_unknown --emit-json --windows-minutes 1440 --policy-off | tee data/reports/decision_trend.txt
+          python tools/decision_trend.py --fail-below-avg 0.6 --exclude-class legacy_unknown --emit-json --windows-minutes 1440 --policy-off --adaptive-risk-thresholds | tee data/reports/decision_trend.txt
           if grep -q "TREND: INSUFFICIENT_DATA" data/reports/decision_trend.txt; then
             echo "TREND_GATE: SOFT (insufficient_data)"
             if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
