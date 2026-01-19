@@ -58,40 +58,6 @@ jobs:
       - name: Generate decision dashboard
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
 
-      - name: CI warmup decision events (min 5 for trend)
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import time
-          import uuid
-          os.makedirs("data", exist_ok=True)
-          path = "data/decision_events.log"
-          now = time.time()
-          def emit(score=0.6, confidence=0.55):
-            e = {
-              "type": "director_decision",
-              "decision": "ci_warmup",
-              "next_step": "none",
-              "agent": "director",
-              "decision_class": "process",
-              "synthetic": True,
-              "penalty_reason": None,
-              "score": score,
-              "effective_score": score,
-              "confidence": confidence,
-              "risk_level": "low",
-              "schema_version": "1.0",
-              "event_id": uuid.uuid4().hex,
-              "ts": now
-            }
-            with open(path, "a", encoding="utf-8") as f:
-              f.write(json.dumps(e, ensure_ascii=False) + "\n")
-          for _ in range(4):
-            emit()
-          print("CI_WARMUP_EVENTS_ADDED=4")
-          PY
-
       - name: Decision trend gate
         run: |
           mkdir -p data/reports
