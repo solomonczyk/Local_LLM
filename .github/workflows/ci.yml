@@ -85,6 +85,7 @@ jobs:
             data/reports/dashboard_daily.md
             data/reports/decision_trend.txt
             data/reports/rollback_plan.json
+            data/reports/adaptive_threshold_state.json
           if-no-files-found: ignore
 
   security-check:
