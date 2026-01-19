@@ -96,7 +96,7 @@ jobs:
               "decision_class": "process",
               "risks": [],
               "next_step": "CI seed to satisfy min_required",
-              "synthetic": False
+              "synthetic": True
             })
 
           with open(path, "a", encoding="utf-8") as f:
