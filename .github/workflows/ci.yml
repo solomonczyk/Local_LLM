@@ -59,7 +59,9 @@ jobs:
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
 
       - name: Decision trend gate
-        run: python tools/decision_trend.py --fail-below-avg 0.6 --exclude-class legacy_unknown --emit-json --windows-minutes 1440 --policy-off | tee data/reports/decision_trend.txt
+        run: |
+          mkdir -p data/reports
+          python tools/decision_trend.py --fail-below-avg 0.6 --exclude-class legacy_unknown --emit-json --windows-minutes 1440 --policy-off | tee data/reports/decision_trend.txt
 
       - name: Upload decision trend baseline
         uses: actions/upload-artifact@v4
