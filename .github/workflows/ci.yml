@@ -74,7 +74,7 @@ jobs:
               "decision": "ci_warmup",
               "next_step": "none",
               "agent": "director",
-              "decision_class": "process",
+              "decision_class": "legacy_unknown",
               "penalty_reason": None,
               "score": score,
               "effective_score": score,
