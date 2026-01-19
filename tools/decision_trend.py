@@ -874,8 +874,11 @@ def main() -> None:
                 max_risk_level = risk_level
         filtered.append(event)
 
-    events = filtered
-    stats["kept"] = len(events)
+    kept_events = filtered
+    stats["kept"] = len(kept_events)
+    count_for_min_required = len(kept_events)
+    events_for_scoring = [event for event in kept_events if not event.get("synthetic")]
+    events = events_for_scoring
     if args.debug_window:
         for event in events:
             score = event.get("score")
@@ -948,10 +951,10 @@ def main() -> None:
                 f"high_risk_share={high_risk_share:.2f}"
             )
         min_required = args.min_count or MIN_EVENTS
-        if len(effective_scores) < min_required:
+        if count_for_min_required < min_required:
             trend_status = "INSUFFICIENT_DATA"
             print(
-                f"TREND: {trend_status} (count={len(effective_scores)}, min_required={min_required})"
+                f"TREND: {trend_status} (count={count_for_min_required}, min_required={min_required})"
             )
             counts_line = "BUCKET_COUNTS: " + " ".join(
                 f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits
@@ -1030,7 +1033,7 @@ def main() -> None:
                     "exclude_class": args.exclude_class,
                     "min_count": min_required,
                     "insufficient_reason": (
-                        f"total({len(effective_scores)}) < min_count({min_required})"
+                        f"total({count_for_min_required}) < min_count({min_required})"
                     ),
                     "max_risk_level": max_risk_level,
                     "shadow_policy_candidates": {
