@@ -175,6 +175,11 @@ def main() -> None:
         trend_printed = False
         policy_apply_printed = False
         avg_debug_printed = False
+        adaptive_impact_printed = False
+        adaptive_cooldown_printed = False
+        adaptive_guard_printed = False
+        adaptive_stability_printed = False
+        adaptive_status_printed = False
         mitigated_printed = False
         for window in windows:
             effective_since_ts = args.since_ts
@@ -225,6 +230,21 @@ def main() -> None:
                 if line.startswith("AVG_DEBUG:") and not avg_debug_printed:
                     print(line)
                     avg_debug_printed = True
+                if line.startswith("ADAPTIVE_IMPACT:") and not adaptive_impact_printed:
+                    print(line)
+                    adaptive_impact_printed = True
+                if line.startswith("ADAPTIVE_COOLDOWN:") and not adaptive_cooldown_printed:
+                    print(line)
+                    adaptive_cooldown_printed = True
+                if line.startswith("ADAPTIVE_GUARD:") and not adaptive_guard_printed:
+                    print(line)
+                    adaptive_guard_printed = True
+                if line.startswith("ADAPTIVE_STABILITY:") and not adaptive_stability_printed:
+                    print(line)
+                    adaptive_stability_printed = True
+                if line.startswith("ADAPTIVE_STATUS:") and not adaptive_status_printed:
+                    print(line)
+                    adaptive_status_printed = True
                 if line.startswith("TREND:") and not trend_printed:
                     print(line)
                     trend_printed = True
@@ -267,6 +287,16 @@ def main() -> None:
             )
             if adaptive_line:
                 summary["adaptive_threshold_line"] = adaptive_line
+            adaptive_status_line = next(
+                (
+                    line
+                    for line in result.stdout.splitlines()
+                    if line.startswith("ADAPTIVE_STATUS:")
+                ),
+                None,
+            )
+            if adaptive_status_line:
+                summary["adaptive_status_line"] = adaptive_status_line
             if args.policy_sensitivity:
                 cmd_off = cmd + ["--policy-off"]
                 result_off = subprocess.run(cmd_off, capture_output=True, text=True)
@@ -502,6 +532,7 @@ def main() -> None:
                 else:
                     pressure_line = f"ROLLBACK_PRESSURE: OK (simulated={outcomes['simulated']})"
                 adaptive_line = summaries[0].get("adaptive_threshold_line", "ADAPTIVE_THRESHOLD: none")
+                adaptive_status_line = summaries[0].get("adaptive_status_line", "ADAPTIVE_STATUS: none")
                 trend_line = f"TREND: {summaries[0].get('trend_status')}"
                 simulation_line = (
                     f"ROLLBACK_SIMULATION: {simulation_status}"
@@ -519,6 +550,7 @@ def main() -> None:
                 with Path(summary_path).open("a", encoding="utf-8") as summary_file:
                     summary_file.write(trend_line + "\n")
                     summary_file.write(adaptive_line + "\n")
+                    summary_file.write(adaptive_status_line + "\n")
                     summary_file.write(rollback_line + "\n")
                     summary_file.write(readiness_line + "\n")
                     summary_file.write(simulation_line + "\n")
@@ -933,23 +965,124 @@ def main() -> None:
     )
     if args.fail_below_avg is not None or args.print_bad_penalties:
         base_threshold = args.fail_below_avg if args.fail_below_avg is not None else 0.6
-        threshold = base_threshold
-        if args.adaptive_risk_thresholds:
-            high_risk_count = 0
-            for event in events:
-                risk_level = normalize_risk_level(event.get("risk_level"))
-                if risk_level in ("high", "critical"):
-                    high_risk_count += 1
-            high_risk_share = high_risk_count / len(events) if events else 0.0
-            if high_risk_share >= 0.8:
-                threshold = 0.7
-            elif high_risk_share >= 0.5:
-                threshold = 0.65
-            print(
-                "ADAPTIVE_THRESHOLD: "
-                f"base={base_threshold} effective={threshold} "
-                f"high_risk_share={high_risk_share:.2f}"
+        high_risk_count = 0
+        for event in events:
+            risk_level = normalize_risk_level(event.get("risk_level"))
+            if risk_level in ("high", "critical"):
+                high_risk_count += 1
+        sample_count = len(events)
+        high_risk_share = high_risk_count / sample_count if sample_count else 0.0
+        hrs = round(high_risk_share, 2)
+        effective_threshold = base_threshold
+        min_samples_for_adaptive = 10
+        adaptive_guard_status = "OK"
+        if sample_count < min_samples_for_adaptive:
+            adaptive_guard_status = "SKIP"
+            print(f"ADAPTIVE_GUARD: SKIP (insufficient_samples={sample_count})")
+        else:
+            print(f"ADAPTIVE_GUARD: OK (samples={sample_count})")
+            if hrs >= 0.8:
+                effective_threshold = base_threshold + 0.10
+            elif hrs >= 0.5:
+                effective_threshold = base_threshold + 0.05
+            elif hrs >= 0.4:
+                effective_threshold = base_threshold + 0.03
+        print(
+            "ADAPTIVE_THRESHOLD: "
+            f"base={base_threshold} effective={effective_threshold} "
+            f"high_risk_share={hrs:.2f} "
+            f"high_risk_count={high_risk_count} total={sample_count}"
+        )
+        cooldown_path = Path("data/reports/adaptive_threshold_state.json")
+        cooldown_path.parent.mkdir(parents=True, exist_ok=True)
+        now_ts = time.time()
+        prev_effective = None
+        adaptive_cooldown_mode = "INIT"
+        if not cooldown_path.exists():
+            cooldown_path.write_text(
+                json.dumps(
+                    {
+                        "last_effective_threshold": effective_threshold,
+                        "ts": now_ts,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
             )
+            print(f"ADAPTIVE_COOLDOWN: INIT (effective={effective_threshold:.2f})")
+            prev_effective = effective_threshold
+        else:
+            last_effective = None
+            last_ts = None
+            try:
+                state = json.loads(cooldown_path.read_text(encoding="utf-8"))
+                last_effective = state.get("last_effective_threshold")
+                last_ts = state.get("ts")
+            except json.JSONDecodeError:
+                last_effective = None
+                last_ts = None
+            if isinstance(last_effective, (int, float)):
+                prev_effective = last_effective
+            hold_cooldown = False
+            minutes_since_change = None
+            if isinstance(last_effective, (int, float)) and isinstance(last_ts, (int, float)):
+                minutes_since_change = (now_ts - last_ts) / 60
+                if minutes_since_change < 60:
+                    effective_threshold = last_effective
+                    hold_cooldown = True
+            if hold_cooldown:
+                adaptive_cooldown_mode = "HOLD"
+                minutes_value = int(minutes_since_change or 0)
+                print(
+                    "ADAPTIVE_COOLDOWN: HOLD "
+                    f"(effective={effective_threshold:.2f} minutes_since_change={minutes_value})"
+                )
+            else:
+                adaptive_cooldown_mode = "UPDATE"
+                cooldown_path.write_text(
+                    json.dumps(
+                        {
+                            "last_effective_threshold": effective_threshold,
+                            "ts": now_ts,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
+                print(f"ADAPTIVE_COOLDOWN: UPDATE (effective={effective_threshold:.2f})")
+        if prev_effective is None:
+            prev_effective = effective_threshold
+        delta = effective_threshold - prev_effective
+        status = "STABLE" if abs(delta) < 1e-9 else "CHANGED"
+        delta_str = f"{delta:+.2f}"
+        print(
+            "ADAPTIVE_STABILITY: "
+            f"{status} (effective={effective_threshold:.2f} delta={delta_str})"
+        )
+        adaptive_status_line = (
+            "ADAPTIVE_STATUS: "
+            f"guard={adaptive_guard_status} "
+            f"samples={sample_count} "
+            f"hrs={hrs:.2f} "
+            f"effective={effective_threshold:.2f} "
+            f"cooldown={adaptive_cooldown_mode} "
+            f"stability={status}"
+        )
+        print(adaptive_status_line)
+        threshold = effective_threshold
+        grace = args.grace or 0.0
+        def classify_threshold(avg_value: float, threshold_value: float, grace_value: float) -> str:
+            if avg_value < threshold_value - grace_value:
+                return "FAIL"
+            if avg_value < threshold_value:
+                return "WARN"
+            return "PASS"
+        base_status = classify_threshold(avg_for_trend, base_threshold, grace)
+        effective_status = classify_threshold(avg_for_trend, threshold, grace)
+        impact = "none"
+        if threshold > base_threshold and base_status == "PASS" and effective_status != "PASS":
+            impact = "escalated"
+        print(f"ADAPTIVE_IMPACT: {impact}")
         min_required = args.min_count or MIN_EVENTS
         if count_for_min_required < min_required:
             trend_status = "INSUFFICIENT_DATA"
