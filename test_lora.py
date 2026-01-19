@@ -12,6 +12,8 @@ It is skipped during `pytest` runs to keep the unit test suite deterministic.
 
 import pytest
 
+pytestmark = pytest.mark.requires_torch
+
 pytest.skip("Manual LoRA smoke script (requires local model weights + compatible deps).", allow_module_level=True)
 
 import torch

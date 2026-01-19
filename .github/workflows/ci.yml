@@ -50,7 +50,7 @@ jobs:
           pip install pytest pytest-cov
       
       - name: Run unit tests
-        run: python -m pytest -q
+        run: python -m pytest -q -m "not requires_torch"
         env:
           DIRECTOR_ACTIVE_MODE: "false"
           SHADOW_DIRECTOR_ENABLED: "false"

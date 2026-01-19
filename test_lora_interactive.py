@@ -6,6 +6,8 @@
  
 import pytest
 
+pytestmark = pytest.mark.requires_torch
+
 pytest.skip(
     "Manual LoRA interactive script (requires torch/transformers).",
     allow_module_level=True,
