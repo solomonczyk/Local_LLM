@@ -5,6 +5,7 @@ on:
     branches: [master, main]
   pull_request:
     branches: [master, main]
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -53,6 +54,29 @@ jobs:
         env:
           DIRECTOR_ACTIVE_MODE: "false"
           SHADOW_DIRECTOR_ENABLED: "false"
+
+      - name: Generate decision dashboard
+        run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
+
+      - name: Decision trend gate
+        run: python tools/decision_trend.py --fail-below-avg 0.6 --exclude-class legacy_unknown --emit-json --windows-minutes 1440 --policy-off | tee data/reports/decision_trend.txt
+
+      - name: Upload decision trend baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: decision_trend_baseline_${{ github.sha }}
+          path: data/reports/decision_trend_baseline.json
+          if-no-files-found: warn
+
+      - name: Upload decision dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: decision-dashboard-${{ github.run_id }}
+          path: |
+            data/reports/dashboard_daily.md
+            data/reports/decision_trend.txt
+            data/reports/rollback_plan.json
+          if-no-files-found: ignore
 
   security-check:
     runs-on: ubuntu-latest
