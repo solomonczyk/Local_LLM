@@ -11,6 +11,7 @@ from .orchestrator import get_orchestrator
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+
 def main():
     logger.info("Agent System CLI")
     logger.info("=" * 50)
@@ -62,7 +63,7 @@ def main():
         result = orchestrator.execute_task(task, two_pass=True)
 
         if result["success"]:
-            logger.info(f"\n[OK] Result:")
+            logger.info("\n[OK] Result:")
             logger.info(json.dumps(result, indent=2, default=str)[:3000])
         else:
             logger.error(f"\n[ERROR] {result['error']}")
@@ -79,7 +80,7 @@ def main():
         result = orchestrator.execute_task(task, use_consilium=True)
 
         if result["success"]:
-            logger.info(f"\n[OK] Consilium result:")
+            logger.info("\n[OK] Consilium result:")
             logger.info(json.dumps(result, indent=2, default=str)[:2000])
         else:
             logger.error(f"\n[ERROR] {result['error']}")
@@ -106,6 +107,7 @@ def main():
 
     else:
         logger.error(f"Unknown command: {command}")
+
 
 if __name__ == "__main__":
     main()

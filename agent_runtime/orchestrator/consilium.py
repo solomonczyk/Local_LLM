@@ -8,7 +8,7 @@ import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .agent import Agent
 from .kb_manager import KnowledgeBaseManager
@@ -16,9 +16,9 @@ from .smart_routing import route_agents
 
 # Добавляем путь для импорта agent_system
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from agent_system.config import AgentConfig
-from agent_system.shadow_director import shadow_director
-from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
+from agent_system.config import AgentConfig  # noqa: E402
+from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel  # noqa: E402
+
 
 class Consilium:
     """Консилиум специализированных агентов"""
@@ -144,7 +144,7 @@ class Consilium:
             print(f"[ROUTING] Smart routing: {routing_info['mode']}")
             print(f"[ROUTING] Confidence: {routing_info['confidence']}, Domains: {routing_info['domains_matched']}")
             if routing_info.get("downgraded"):
-                print(f"[ROUTING] DOWNGRADED from CRITICAL to STANDARD (low confidence)")
+                print("[ROUTING] DOWNGRADED from CRITICAL to STANDARD (low confidence)")
             print(f"[ROUTING] Selected agents: {routing_info['agents']}")
         else:
             # Fallback на статичный список из конфига
@@ -152,6 +152,10 @@ class Consilium:
             effective_mode = self.mode
             include_director = "director" in self.active_agents
             print(f"[*] Static routing: {self.mode}")
+
+        force_director = os.getenv("DIRECTOR_FORCE", "false").lower() == "true"
+        if effective_mode == "CRITICAL" or self.mode == "CRITICAL" or force_director:
+            include_director = True
 
         if include_director and not self.director_adapter.enabled:
             include_director = False
@@ -272,24 +276,24 @@ class Consilium:
         # Базовые специализации
         specializations = {
             "architect": (
-                f"As a Software Architect, analyze this from the perspective of "
+                "As a Software Architect, analyze this from the perspective of "
                 f"system design, scalability, and maintainability:\n\n{task}"
             ),
             "security": (
-                f"As a Security Specialist, analyze this for potential security risks, "
+                "As a Security Specialist, analyze this for potential security risks, "
                 f"vulnerabilities, and best practices:\n\n{task}"
             ),
             "qa": (
-                f"As a QA Engineer, analyze this for edge cases, test coverage, "
+                "As a QA Engineer, analyze this for edge cases, test coverage, "
                 f"and potential bugs:\n\n{task}"
             ),
             "dev": f"As a Developer, provide a practical implementation perspective:\n\n{task}",
             "seo": (
-                f"As an SEO Expert, analyze this for search engine optimization, "
+                "As an SEO Expert, analyze this for search engine optimization, "
                 f"discoverability, metadata, and content strategy:\n\n{task}"
             ),
             "ux": (
-                f"As a UX/UI Designer, analyze this for user experience, interface design, "
+                "As a UX/UI Designer, analyze this for user experience, interface design, "
                 f"accessibility, and usability:\n\n{task}"
             ),
         }
@@ -473,10 +477,12 @@ Be concise and decisive."""
 _consilium_instance: Optional[Consilium] = None
 
 def get_consilium() -> Consilium:
-    """Получить singleton экземпляр консилиума (lazy init)"""
+    """???????? singleton ????????? ?????????? (lazy init)"""
     global _consilium_instance
     if _consilium_instance is None:
-        _consilium_instance = Consilium()
+        llm_url = os.getenv("AGENT_LLM_URL", "http://localhost:8010/v1")
+        tool_url = os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
+        _consilium_instance = Consilium(llm_url=llm_url, tool_url=tool_url)
     return _consilium_instance
 
 # Для обратной совместимости - property-like доступ

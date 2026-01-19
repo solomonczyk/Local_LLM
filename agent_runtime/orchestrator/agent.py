@@ -33,10 +33,12 @@ TOOL_SPECS = {
 
 READ_ONLY_SQL_PREFIXES = ("select", "show", "describe", "explain", "with")
 
+
 class CircuitBreakerError(Exception):
     """Исключение когда Circuit Breaker открыт"""
 
     pass
+
 
 class CircuitBreaker:
     """
@@ -154,8 +156,10 @@ class CircuitBreaker:
             "recent_state_changes": self.state_changes[-3:],  # последние 3
         }
 
+
 # Глобальный Circuit Breaker для LLM (shared между всеми агентами)
 _llm_circuit_breaker: Optional[CircuitBreaker] = None
+
 
 def get_llm_circuit_breaker() -> CircuitBreaker:
     """Получить singleton Circuit Breaker для LLM"""
@@ -164,6 +168,7 @@ def get_llm_circuit_breaker() -> CircuitBreaker:
         _llm_circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60, success_threshold=1)
     return _llm_circuit_breaker
 
+
 class Agent:
     """Базовый агент для работы с LLM и tools"""
 
@@ -171,11 +176,15 @@ class Agent:
     TIMING_WINDOW = 20
     PREVIEW_TOOLS = {"write_file", "edit_file", "delete_file", "copy_file", "move_file"}
 
-    def __init__(self, name: str = "Agent", role: str = "Generic Agent", 
-                 llm_url: str = None, 
-                 tool_url: str = None):
+    def __init__(
+        self,
+        name: str = "Agent",
+        role: str = "Generic Agent",
+        llm_url: str = None,
+        tool_url: str = None,
+    ):
         """Инициализация агента
-        
+
         Hybrid Architecture:
         - Agents use AGENT_LLM_URL (local Qwen via ngrok)
         - Director uses DIRECTOR_LLM_URL (GPT-5.2 via OpenAI)
@@ -195,7 +204,7 @@ class Agent:
             self.llm_url = os.getenv("DIRECTOR_LLM_URL", self.llm_url)
             self.model = os.getenv("DIRECTOR_MODEL", self.model)
             self.llm_api_key = os.getenv("OPENAI_API_KEY", self.llm_api_key)
-        
+
         # Метрики LLM
         self._llm_times = deque(maxlen=self.TIMING_WINDOW)
         self._llm_call_count = 0
@@ -203,11 +212,11 @@ class Agent:
         self._max_retries = 3
         self._retry_base_delay = 1.0
         self._retry_max_delay = 10.0
-        
+
         # Метрики retrieval
         self._retrieval_times = deque(maxlen=self.TIMING_WINDOW)
         self._retrieval_call_count = 0
-        
+
         # Repo snapshot cache
         self.repo_snapshot = None
         self.conversation_history = []
@@ -469,11 +478,18 @@ class Agent:
         lower = task.lower()
         required: List[str] = []
 
-        if re.search(r"\b(search|find|locate|grep|поиск|найти|найди|искать)\b", lower):
+        has_search_intent = bool(
+            re.search(r"\b(search|find|locate|grep|поиск|найди|найти|искать|отыщи)\b", lower)
+        )
+        if has_search_intent:
+            required.append("search")
+
+        env_match = re.search(r"\b[A-Z][A-Z0-9_]{2,}\b", task)
+        if env_match and re.search(r"\b(used|usage|where|где|использ)\w*\b", lower):
             required.append("search")
 
         file_hint = re.search(
-            r"\b(docker-compose|nginx|config|конфиг|настройк|yaml|yml|json|toml|ini|env|\.conf)\b",
+            r"\b(docker-compose|docker compose|nginx|config|конфиг|конфигурац|настройк|yaml|yml|json|toml|ini|env|\.conf)\b",
             lower,
         )
         file_path_match = re.search(
@@ -489,8 +505,10 @@ class Agent:
             if not has_explicit_path:
                 required.append("search")
             required.append("read_file")
+            if has_explicit_path and not has_search_intent:
+                required = [tool for tool in required if tool != "search"]
 
-        if not required and re.search(r"\b(list|dir|directory|folders|список\w*|папк\w*|каталог\w*|директори\w*)\b", lower):
+        if not required and re.search(r"\b(list|dir|directory|folders|список|каталог|директори|папк|файл)\w*\b", lower):
             required.append("list_dir")
 
         return list(dict.fromkeys(required))
@@ -872,7 +890,7 @@ class Agent:
             if ch == close_char:
                 depth -= 1
                 if depth == 0:
-                    return text[start : i + 1]
+                    return text[start:i + 1]
 
         return None
 
@@ -949,6 +967,8 @@ class Agent:
             r"\bcreate file\s+([^\s\"']+)\b",
             r"\bсоздай файл\s+([^\s\"']+)\b",
             r"\bсоздать файл\s+([^\s\"']+)\b",
+            r"\bсоздай файл с именем\s+([^\s\"']+)\b",
+            r"\bсоздай файл под названием\s+([^\s\"']+)\b",
         ]
         matches: List[str] = []
         for pattern in patterns:
@@ -1003,9 +1023,9 @@ class Agent:
             return "proxy_pass"
         if "ports:" in lowered:
             return "ports:"
-        if re.search(r"\bports?\b", lowered) or re.search(r"\bport\s+\\d+\b", lowered):
+        if re.search(r"\bports?\b", lowered) or re.search(r"\bport\s+\d+\b", lowered):
             return "ports"
-        if re.search(r"\b(порт|порты|проброшен|проброс)\b", lowered):
+        if re.search(r"\b(порт|порты|портов|портами|портах|listen|listener)\b", lowered):
             return "ports"
         if "nginx" in lowered:
             return "nginx.conf"
@@ -1035,14 +1055,24 @@ class Agent:
     def _should_use_search_then_read_top_n(self, task: str) -> bool:
         if not isinstance(task, str) or not task.strip():
             return False
+        path_match = re.search(
+            r"\b[\w./-]+\.(py|js|ts|md|yml|yaml|json|toml|ini|conf|env|sh|ps1)\b",
+            task,
+        )
+        if path_match:
+            token = path_match.group(0)
+            if "/" in token or "\\" in token:
+                return False
         lower = task.lower()
         if "todo" in lower or "fixme" in lower:
             return True
-        if "proxy_pass" in lower:
+        if "proxy_pass" in lower or "nginx" in lower:
             return True
-        if "ports:" in lower or re.search(r"\bports?\b", lower):
+        if "docker-compose" in lower or ("docker" in lower and "compose" in lower):
             return True
-        if re.search(r"\b(порт|порты|проброшен|проброс)\b", lower):
+        if "ports:" in lower or re.search(r"\bports?\b", lower) or re.search(r"\bport\s+\d+\b", lower):
+            return True
+        if re.search(r"\b(порт|порты|портов|портами|портах|listen|listener)\b", lower):
             return True
 
         token = self._default_search_query_for_task(task)
@@ -1073,7 +1103,7 @@ class Agent:
         if q in {"proxy_pass"} or "nginx" in lower:
             return ["nginx*.conf", "**/*.conf"]
         if q.startswith("ports") or "docker-compose" in lower or "compose" in lower:
-            return ["docker-compose*.yml", "docker-compose*.yaml"]
+            return ["docker-compose*.yml", "docker-compose*.yaml", "nginx*.conf", "**/*.conf"]
         if q in {"todo", "fixme", "todo|fixme"}:
             return None
         if re.match(r"^[A-Z][A-Z0-9_]{2,}$", query):
@@ -1101,8 +1131,12 @@ class Agent:
                 score -= 20
             elif p.startswith("docker-compose"):
                 score -= 10
+            elif p in {"nginx.conf", "nginx-https-local.conf", "nginx-https.conf"}:
+                score -= 8
             elif p.endswith((".yml", ".yaml")):
                 score -= 2
+            elif p.endswith(".conf"):
+                score -= 1
 
         if re.match(r"^[A-Z][A-Z0-9_]{2,}$", query):
             if p in {"docker-compose.yml", "docker-compose-prod.yml", ".env.example"}:
@@ -1263,7 +1297,7 @@ class Agent:
             lines.append("")
             header = f"--- file: {path} (first {max_lines} lines){' [TRUNCATED]' if truncated else ''} ---"
 
-            current_len = sum(len(l) + 1 for l in lines)
+            current_len = sum(len(line_item) + 1 for line_item in lines)
             projected = current_len + len(header) + 1 + len(snippet) + 1
             if projected > max_total_chars:
                 remaining = max_total_chars - current_len - len(header) - 1 - len("\n...[EVIDENCE TRUNCATED]...\n")
@@ -1543,15 +1577,66 @@ class Agent:
             return "List file:line hits from search results."
         return "Use tool results only; do not guess."
 
+    def _extract_readme_ui_urls(self, content: str) -> List[str]:
+        if not isinstance(content, str) or not content:
+            return []
+        urls: List[str] = []
+        for line in content.splitlines():
+            if "UI:" not in line:
+                continue
+            urls.extend(re.findall(r"https?://[^\s)`]+", line))
+        deduped: List[str] = []
+        for url in urls:
+            if url not in deduped:
+                deduped.append(url)
+        return deduped
+
+    def _maybe_answer_readme_ui(self, task: str, results: List[Dict[str, Any]]) -> Optional[str]:
+        if not isinstance(task, str) or not task.strip():
+            return None
+        lower = task.lower()
+        if "readme" not in lower or ("ui" not in lower and "\u0430\u0434\u0440\u0435\u0441" not in lower):
+            return None
+        for item in results:
+            if item.get("tool") != "read_file" or not item.get("success"):
+                continue
+            payload = item.get("result") or {}
+            if not isinstance(payload, dict):
+                continue
+            content = payload.get("content", "")
+            urls = self._extract_readme_ui_urls(content if isinstance(content, str) else "")
+            if urls:
+                if len(urls) == 1:
+                    return f"UI: {urls[0]}"
+                return "UI: " + ", ".join(urls)
+        return None
+
+    def _compact_repeated_final_answer(self, text: str) -> str:
+        if not isinstance(text, str) or not text:
+            return text
+        marker = "the final answer is"
+        lower = text.lower()
+        if lower.count(marker) < 3:
+            return text
+        idx = lower.rfind(marker)
+        tail = text[idx + len(marker):].lstrip(" :\n")
+        if not tail:
+            return text
+        return f"The final answer is: {tail}".strip()
+
     def _finalize_with_tool_results(
         self, messages: List[Dict[str, str]], first_response: str, results: List[Dict[str, Any]]
     ) -> str:
-        tool_summary = self._format_tool_results(results)
         task_text = ""
         for msg in reversed(messages):
             if msg.get("role") == "user":
                 task_text = msg.get("content", "") or ""
                 break
+        forced = self._maybe_answer_readme_ui(task_text, results)
+        if forced:
+            return forced
+
+        tool_summary = self._format_tool_results(results)
         focus = self._tool_focus_instructions(task_text)
         messages_pass2 = [
             *messages,
@@ -1569,9 +1654,9 @@ class Agent:
             ]
             retry = self._call_llm(messages_pass3)
             if not self._extract_tool_calls(retry):
-                return retry
+                return self._compact_repeated_final_answer(retry)
             return "Final response blocked: model kept requesting tools after results."
-        return final
+        return self._compact_repeated_final_answer(final)
 
     def think_with_tools(self, task: str, require_confirmation: bool = True) -> Dict[str, Any]:
         if self._should_use_search_then_read_top_n(task):

@@ -1071,6 +1071,7 @@ def main() -> None:
         print(adaptive_status_line)
         threshold = effective_threshold
         grace = args.grace or 0.0
+
         def classify_threshold(avg_value: float, threshold_value: float, grace_value: float) -> str:
             if avg_value < threshold_value - grace_value:
                 return "FAIL"
