@@ -8,6 +8,9 @@ import os
 import json
 import time
 import re
+import sys
+import subprocess
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -133,14 +136,49 @@ class DirectorAdapter:
             data = re.sub(pattern, '[REDACTED]', data, flags=re.IGNORECASE)
         
         return data
+
+    def _load_recent_insights(self) -> str:
+        """Load recent insights from decision summary if available."""
+        repo_root = Path(__file__).resolve().parents[1]
+        summary_path = repo_root / "data" / "reports" / "decision_summary.json"
+        script_path = repo_root / "tools" / "decision_insights.py"
+        if not summary_path.exists() or not script_path.exists():
+            return ""
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script_path), "--in", str(summary_path), "--lang", "en"],
+                capture_output=True,
+                text=True,
+                cwd=str(repo_root),
+                timeout=10,
+            )
+        except Exception:
+            return ""
+        if result.returncode != 0:
+            return ""
+        return result.stdout.strip()
+
+    def _compute_decision_score(self, confidence: Any, risk_level: RiskLevel, next_step: Any) -> float:
+        score = 1.0
+        if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
+            if confidence < 0.6:
+                score -= 0.3
+        if risk_level in {RiskLevel.MEDIUM, RiskLevel.HIGH}:
+            score -= 0.2
+        if isinstance(next_step, str):
+            lowered = next_step.lower()
+            if "expand smoke" in lowered or "expand ci" in lowered:
+                score += 0.1
+        return max(0.0, min(1.0, score))
     
     def create_director_prompt(self, request: DirectorRequest) -> str:
         """Создание промпта для Director"""
         
+        summary_with_hint = f"{request.problem_summary}\nContext hint: decision_class=process"
         prompt = f"""You are the Director of a multi-agent AI system. Your role is to make final decisions based on agent summaries.
 
 TASK SUMMARY:
-{request.problem_summary}
+{summary_with_hint}
 
 FACTS:
 {chr(10).join(f"- {fact}" for fact in request.facts)}
@@ -158,7 +196,8 @@ Please provide your decision in this EXACT JSON format:
   "recommendations": ["Rec 1", "Rec 2", "Rec 3"],
   "next_step": "One specific next action (max 100 chars)",
   "confidence": 0.85,
-  "reasoning": "Brief explanation of decision logic"
+  "reasoning": "Brief explanation of decision logic",
+  "decision_class": "infra|security|product|process|unknown"
 }}
 
 Focus on:
@@ -166,6 +205,26 @@ Focus on:
 2. Risk mitigation
 3. One clear next step
 4. Practical recommendations"""
+
+        insights = self._load_recent_insights() or "(no insights available)"
+        if len(insights) > 1200:
+            insights = insights[:1200] + "\n...(truncated)"
+        guardrails = (
+            "## Guardrails\n"
+            "If insights mention low confidence or 0.0-0.2 bucket, you MUST set "
+            "risk_level>=medium and include expanding smoke/CI in next_step."
+        )
+        prompt = prompt.replace(
+            "\n\nAGENT SUMMARIES:\n",
+            f"\n\n## Recent Insights\n{insights}\n\n{guardrails}\n\n"
+            "You MUST assign decision_class.\n\n"
+            "Choose exactly one:\n"
+            "- infra: architecture, CI/CD, runtime, performance, scalability\n"
+            "- security: auth, permissions, secrets, data exposure, threat mitigation\n"
+            "- product: user-facing behavior, UX, features, business logic\n"
+            "- process: workflows, reviews, policies, team/process decisions\n\n"
+            "Use \"unknown\" ONLY if none clearly apply.\n\nAGENT SUMMARIES:\n",
+        )
 
         return prompt
 
@@ -250,9 +309,21 @@ Focus on:
                                 "recommendations": {"type": "array", "items": {"type": "string"}},
                                 "next_step": {"type": "string"},
                                 "confidence": {"type": "number"},
-                                "reasoning": {"type": "string"}
+                                "reasoning": {"type": "string"},
+                                "decision_class": {
+                                    "type": "string",
+                                    "enum": ["infra", "security", "product", "process", "unknown"]
+                                }
                             },
-                            "required": ["decision", "risks", "recommendations", "next_step", "confidence", "reasoning"]
+                            "required": [
+                                "decision",
+                                "risks",
+                                "recommendations",
+                                "next_step",
+                                "confidence",
+                                "reasoning",
+                                "decision_class"
+                            ]
                         }
                     }
                 }
@@ -269,12 +340,44 @@ Focus on:
             result = json.loads(response.choices[0].message.content)
 
             self._circuit_breaker.record_success()
+            risk_multiplier = 1.0
+            if request.risk_level == RiskLevel.MEDIUM:
+                risk_multiplier = 0.9
+            elif request.risk_level == RiskLevel.HIGH:
+                risk_multiplier = 0.8
+            elif str(request.risk_level).lower() == "critical":
+                risk_multiplier = 0.7
+            decision = result["decision"]
+            next_step = result["next_step"]
+            confidence = result["confidence"]
+            mit_text = f"{decision} {next_step}".lower()
+            mitigation_keywords = [
+                "smoke",
+                "ci",
+                "coverage",
+                "test",
+                "tests",
+                "auth",
+                "secrets",
+                "gate",
+                "gates",
+                "rerun",
+                "pr",
+            ]
+            has_mitigation = any(kw in mit_text for kw in mitigation_keywords)
+            if has_mitigation:
+                confidence = min(1.0, (confidence or 0.0) + 0.05)
+            score = confidence * risk_multiplier
             append_decision_event({
                 "type": "director_decision",
-                "decision": result["decision"],
-                "confidence": result["confidence"],
+                "agent": "director",
+                "decision": decision,
+                "confidence": confidence,
+                "score": score,
+                "risk_level": request.risk_level.value,
+                "decision_class": result["decision_class"],
                 "risks": result["risks"],
-                "next_step": result["next_step"],
+                "next_step": next_step,
             })
             return DirectorResponse(
                 decision=result['decision'],

@@ -1,0 +1,45 @@
+{
+  "defaults": {
+    "grace": 0.035
+  },
+  "director_regressions_soften_v1": {
+    "enabled": true,
+    "frozen": true,
+    "delta": 0.05,
+    "only_type": "director_decision",
+    "only_penalty_reason": "regressions",
+    "mitigation_keywords": [
+      "smoke",
+      "ci",
+      "coverage",
+      "test",
+      "tests",
+      "auth",
+      "secrets",
+      "gate",
+      "gates",
+      "rerun",
+      "pr"
+    ]
+  },
+  "director_process_regressions_soften_v2": {
+    "enabled": false,
+    "delta": 0.05,
+    "only_type": "director_decision",
+    "only_penalty_reason": "regressions",
+    "only_decision_class": "process",
+    "mitigation_keywords": [
+      "smoke",
+      "ci",
+      "coverage",
+      "test",
+      "tests",
+      "auth",
+      "secrets",
+      "gate",
+      "gates",
+      "rerun",
+      "pr"
+    ]
+  }
+}

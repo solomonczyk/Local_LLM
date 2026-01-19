@@ -9,7 +9,7 @@ from pydantic import BaseModel
 # Добавляем корневую директорию в путь для импорта
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from agent_runtime.orchestrator.orchestrator import get_orchestrator
+from agent_runtime.orchestrator.orchestrator import get_orchestrator  # noqa: E402
 
 TOOL_BASE = os.getenv("TOOL_BASE", "http://localhost:8011")
 LLM_BASE = os.getenv("LLM_BASE", "http://localhost:8010")
@@ -17,6 +17,7 @@ LLM_BASE = os.getenv("LLM_BASE", "http://localhost:8010")
 orchestrator = get_orchestrator()
 
 app = FastAPI(title="Agent Gateway", version="0.1")
+
 
 @app.get("/health")
 def health():
@@ -29,11 +30,13 @@ def health():
         llm_ok = False
     return {"status": "ok", "tool": tool, "llm_reachable": llm_ok}
 
+
 class ChatRequest(BaseModel):
     model: str
     messages: list
     max_tokens: int = 512
     temperature: float = 0.2
+
 
 @app.post("/v1/chat/completions")
 def chat(req: ChatRequest):
@@ -87,10 +90,11 @@ Team Opinions:
         ],
     }
 
+
 if __name__ == "__main__":
     import uvicorn
 
-    print(f"🌐 Agent Gateway starting...")
+    print("🌐 Agent Gateway starting...")
     print(f"🔧 Tool Server: {TOOL_BASE}")
     print(f"🤖 LLM Server: {LLM_BASE}")
     uvicorn.run(app, host="0.0.0.0", port=8002)

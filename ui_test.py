@@ -1,4 +1,8 @@
 """Minimal test UI"""
+import pytest
+
+pytest.skip("Manual UI smoke script (requires gradio).", allow_module_level=True)
+
 import gradio as gr
 import sys
 import os
