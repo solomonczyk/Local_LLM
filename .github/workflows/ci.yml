@@ -64,26 +64,27 @@ jobs:
           import os, json, time
           os.makedirs("data", exist_ok=True)
           path = "data/decision_events.log"
+          if os.path.exists(path) and os.path.getsize(path) > 0:
+            print("Seed skipped: decision_events.log already exists and is non-empty")
+            raise SystemExit(0)
           now = time.time()
-          events = []
-          for i in range(5):
-            events.append({
-              "ts": now + i,
-              "type": "director_decision",
-              "agent": "director",
-              "decision": f"CI seed decision #{i+1}",
-              "confidence": 0.85,
-              "score": 0.85,
-              "risk_level": "LOW",
-              "decision_class": "process",
-              "risks": [],
-              "next_step": "CI seed to satisfy min_required",
-              "synthetic": False
-            })
           with open(path, "w", encoding="utf-8") as f:
-            for e in events:
+            for i in range(5):
+              e = {
+                "ts": now + i,
+                "type": "director_decision",
+                "agent": "director",
+                "decision": f"CI seed decision #{i+1}",
+                "confidence": 0.85,
+                "score": 0.85,
+                "risk_level": "LOW",
+                "decision_class": "process",
+                "risks": [],
+                "next_step": "CI seed to satisfy min_required",
+                "synthetic": True
+              }
               f.write(json.dumps(e, ensure_ascii=False) + "\n")
-          print(f"Wrote {len(events)} events to {path}")
+          print("Seed applied: wrote 5 synthetic events")
           PY
 
       - name: Decision trend gate
