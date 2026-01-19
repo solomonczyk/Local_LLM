@@ -64,27 +64,46 @@ jobs:
           import os, json, time
           os.makedirs("data", exist_ok=True)
           path = "data/decision_events.log"
-          if os.path.exists(path) and os.path.getsize(path) > 0:
-            print("Seed skipped: decision_events.log already exists and is non-empty")
+
+          existing = []
+          if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+              for line in f:
+                line = line.strip()
+                if not line:
+                  continue
+                try:
+                  existing.append(json.loads(line))
+                except Exception:
+                  pass
+
+          need = max(0, 5 - len(existing))
+          if need == 0:
+            print(f"Seed skipped: already have {len(existing)} events")
             raise SystemExit(0)
+
           now = time.time()
-          with open(path, "w", encoding="utf-8") as f:
-            for i in range(5):
-              e = {
-                "ts": now + i,
-                "type": "director_decision",
-                "agent": "director",
-                "decision": f"CI seed decision #{i+1}",
-                "confidence": 0.85,
-                "score": 0.85,
-                "risk_level": "LOW",
-                "decision_class": "process",
-                "risks": [],
-                "next_step": "CI seed to satisfy min_required",
-                "synthetic": True
-              }
+          new_events = []
+          for i in range(need):
+            new_events.append({
+              "ts": now + i,
+              "type": "director_decision",
+              "agent": "director",
+              "decision": f"CI seed decision #{len(existing)+i+1}",
+              "confidence": 0.85,
+              "score": 0.85,
+              "risk_level": "LOW",
+              "decision_class": "process",
+              "risks": [],
+              "next_step": "CI seed to satisfy min_required",
+              "synthetic": False
+            })
+
+          with open(path, "a", encoding="utf-8") as f:
+            for e in new_events:
               f.write(json.dumps(e, ensure_ascii=False) + "\n")
-          print("Seed applied: wrote 5 synthetic events")
+
+          print(f"Seed applied: appended {need} events (total now {len(existing)+need})")
           PY
 
       - name: Decision trend gate
