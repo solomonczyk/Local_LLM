@@ -14,6 +14,7 @@ def validate_director_schema(payload: dict) -> None:
         "next_step",
         "confidence",
         "reasoning",
+        "decision_class",
     }
     if not isinstance(payload, dict):
         raise AssertionError("payload must be an object")
@@ -85,6 +86,7 @@ class TestDirectorSchema(unittest.TestCase):
             "next_step": "Deploy to staging.",
             "confidence": 0.82,
             "reasoning": "Low risk with monitoring in place.",
+            "decision_class": "process",
         }
         content = json.dumps(payload)
 
