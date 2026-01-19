@@ -909,7 +909,9 @@ def main() -> None:
     kept_events = filtered
     stats["kept"] = len(kept_events)
     count_for_min_required = len(kept_events)
-    events_for_scoring = [event for event in kept_events if not event.get("synthetic")]
+    events_for_scoring = [
+        event for event in kept_events if event.get("synthetic") is not True
+    ]
     events = events_for_scoring
     if args.debug_window:
         for event in events:
