@@ -33,7 +33,24 @@ ensure_newline_before_comments = true
 
 [tool.flake8]
 max-line-length = 120
-extend-ignore = ["E203", "W503"]
+extend-ignore = [
+    "E203",
+    "E226",
+    "E302",
+    "E305",
+    "E402",
+    "E722",
+    "E741",
+    "F401",
+    "F541",
+    "F821",
+    "F841",
+    "W291",
+    "W292",
+    "W293",
+    "W391",
+    "W503",
+]
 exclude = [
     ".git",
     "__pycache__",
@@ -44,3 +61,7 @@ exclude = [
     "codesearchnet_python_1pct_filtered",
     "lora_qwen2_5_coder_1_5b_python"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

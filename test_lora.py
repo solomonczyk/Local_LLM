@@ -1,3 +1,19 @@
+"""
+Manual LoRA smoke script (not a unit test).
+
+This file is named like a test, but running it requires:
+- a compatible `peft/transformers` stack
+- the base model weights available locally
+- LoRA adapter weights at `lora_qwen2_5_coder_1_5b_python`
+- (often) a GPU
+
+It is skipped during `pytest` runs to keep the unit test suite deterministic.
+"""
+
+import pytest
+
+pytest.skip("Manual LoRA smoke script (requires local model weights + compatible deps).", allow_module_level=True)
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
