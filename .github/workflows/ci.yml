@@ -240,6 +240,7 @@ jobs:
             data/reports/eval_fails_taxonomy.jsonl
             data/reports/intelligence_manifest.json
             data/reports/intelligence_timeline.jsonl
+            data/reports/intelligence_report.md
             data/reports/training_pack.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
