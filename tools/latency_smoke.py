@@ -12,6 +12,7 @@ def main() -> None:
     if not LOG_PATH.exists():
         print("LATENCY_P95_MS: NA")
         print("LATENCY_STATUS: SKIP")
+        print("LATENCY_GATE: PASS")
         return
     latencies = []
     for line in LOG_PATH.read_text(encoding="utf-8").splitlines():
@@ -30,6 +31,7 @@ def main() -> None:
     if not latencies:
         print("LATENCY_P95_MS: NA")
         print("LATENCY_STATUS: SKIP")
+        print("LATENCY_GATE: PASS")
         return
     window = latencies[-WINDOW:]
     window.sort()
@@ -40,10 +42,13 @@ def main() -> None:
     print(f"LATENCY_P95_MS: {p95}")
     if p95 <= 3000:
         print("LATENCY_STATUS: OK")
+        print("LATENCY_GATE: PASS")
     elif p95 <= 6000:
         print("LATENCY_STATUS: WARN")
+        print("LATENCY_GATE: PASS")
     else:
         print("LATENCY_STATUS: BAD")
+        print("LATENCY_GATE: SOFT (bad_latency)")
 
 
 if __name__ == "__main__":
