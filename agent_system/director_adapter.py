@@ -374,6 +374,8 @@ Focus on:
                 "decision": decision,
                 "confidence": confidence,
                 "score": score,
+                "why_now": "unknown",
+                "what_to_fix": "unknown",
                 "risk_level": request.risk_level.value,
                 "decision_class": result["decision_class"],
                 "risks": result["risks"],

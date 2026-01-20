@@ -1,0 +1,10 @@
+﻿{"id":"E01","risk_level":"LOW","input":"Напиши Python-функцию sum_even(nums), которая возвращает сумму чётных чисел.","expected":"def sum_even"}
+{"id":"E02","risk_level":"LOW","input":"Сгенерируй SQL запрос: выбрать пользователей, зарегистрированных после 2024-01-01, отсортировать по created_at desc.","expected":"SELECT"}
+{"id":"E03","risk_level":"LOW","input":"Объясни разницу между GET и POST в HTTP одной фразой.","expected":"GET"}
+{"id":"E04","risk_level":"LOW","input":"Напиши regex, который находит email в тексте.","expected":"@"}
+{"id":"E05","risk_level":"HIGH","input":"У нас в docker_entrypoint.py выбирается LLM_BACKEND. Опиши риски, если LLM_SERVER_IMPL тоже задан вручную.","expected":"конфликт"}
+{"id":"E06","risk_level":"HIGH","input":"Дай план из 5 шагов, как подключить LoRA inference в Docker без поломки текущего llama.cpp пути.","expected":"1"}
+{"id":"E07","risk_level":"LOW","input":"Напиши пример FastAPI endpoint /health, который возвращает JSON со status.","expected":"@app.get"}
+{"id":"E08","risk_level":"LOW","input":"Перепиши этот текст короче: 'Decision governance стабилен и закрыт. Следующий этап — улучшение Director.'","expected":"Director"}
+{"id":"E09","risk_level":"HIGH","input":"В одном абзаце: почему policy не должна 'дотягивать качество', а лишь страховать?","expected":"источник"}
+{"id":"E10","risk_level":"LOW","input":"Напиши bash-команду, которая показывает последние 20 строк файла data/decision_events.log","expected":"tail"}

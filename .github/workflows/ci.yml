@@ -55,6 +55,14 @@ jobs:
           DIRECTOR_ACTIVE_MODE: "false"
           SHADOW_DIRECTOR_ENABLED: "false"
 
+      - name: Run minimal eval (observability)
+        run: |
+          mkdir -p data/reports
+          python tools/run_minimal_eval.py | tee data/reports/minimal_eval.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            tail -n 2 data/reports/minimal_eval.txt | sed 's/^/MIN_EVAL: /' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Generate decision dashboard
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
 
@@ -96,7 +104,7 @@ jobs:
               "decision_class": "process",
               "risks": [],
               "next_step": "CI seed to satisfy min_required",
-              "synthetic": False
+              "synthetic": True
             })
 
           with open(path, "a", encoding="utf-8") as f:
@@ -118,6 +126,21 @@ jobs:
             exit 0
           fi
 
+      - name: Generate remediation plan
+        run: |
+          if [ -f data/reports/rca_action_priority.txt ]; then
+            export RCA_ACTION_PRIORITY=$(sed 's/^RCA_ACTION_PRIORITY: //' data/reports/rca_action_priority.txt)
+          fi
+          python tools/generate_remediation_plan.py
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            if [ -f data/reports/remediation_plan.json ]; then
+              N=$(python -c "import json; print(len(json.load(open('data/reports/remediation_plan.json'))['items']))")
+              echo "REMEDIATION_PLAN: items=$N" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "REMEDIATION_PLAN: items=0" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
       - name: Upload decision trend baseline
         uses: actions/upload-artifact@v4
         with:
@@ -132,6 +155,7 @@ jobs:
           path: |
             data/reports/dashboard_daily.md
             data/reports/decision_trend.txt
+            data/reports/remediation_plan.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
           if-no-files-found: ignore
