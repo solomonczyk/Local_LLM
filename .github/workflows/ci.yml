@@ -161,6 +161,13 @@ jobs:
             tail -n 1 data/reports/latency_smoke.txt >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Cost smoke (observability)
+        run: |
+          python tools/cost_smoke.py | tee data/reports/cost_smoke.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat data/reports/cost_smoke.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload decision trend baseline
         uses: actions/upload-artifact@v4
         with:
