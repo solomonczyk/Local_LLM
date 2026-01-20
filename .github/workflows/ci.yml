@@ -69,6 +69,13 @@ jobs:
       - name: Generate decision dashboard
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
 
+      - name: Temporal aggregation
+        run: |
+          python tools/temporal_aggregation.py | tee temporal.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat temporal.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Seed decision events for TREND (CI-only)
         run: |
           python - << 'PY'
@@ -241,6 +248,7 @@ jobs:
             data/reports/intelligence_manifest.json
             data/reports/intelligence_timeline.jsonl
             data/reports/intelligence_report.md
+            data/reports/prompt_patch_plan.json
             data/reports/training_pack.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
