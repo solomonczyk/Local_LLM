@@ -24,7 +24,7 @@ def main() -> None:
         if event.get("type") != TARGET_TYPE:
             continue
         latency = event.get("latency_ms")
-        if isinstance(latency, (int, float)):
+        if isinstance(latency, (int, float)) and latency > 0:
             latencies.append(latency)
     if not latencies:
         print("LATENCY_P95_MS: NA")
