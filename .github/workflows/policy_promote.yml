@@ -1,0 +1,53 @@
+﻿name: Policy Promote
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Evaluate auto-promote plan
+        run: |
+          python tools/decision_trend.py --fail-below-avg 0.6 --grace 0.03 --exclude-class legacy_unknown --emit-json --windows-minutes 1440,10080 --drift-max 0.05 --policy-sensitivity --ci-multi | tee data/reports/policy_promote_plan.txt
+
+      - name: Promote policy if planned
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if grep -q "AUTO_PROMOTE_PLAN: none" data/reports/policy_promote_plan.txt; then
+            echo "No auto-promote plan."
+            exit 0
+          fi
+
+          plan_line=$(grep -m 1 "^AUTO_PROMOTE_PLAN:" data/reports/policy_promote_plan.txt)
+          echo "$plan_line"
+
+          branch_name=$(echo "$plan_line" | sed -n 's/.*branch=\([^ ]*\).*/\1/p')
+          pr_title=$(echo "$plan_line" | sed -n 's/.*title="\(.*\)"/\1/p')
+
+          git checkout -b "$branch_name"
+          git add tools/policy_rules.json
+          if git diff --cached --quiet; then
+            echo "Plan exists, but no changes staged. Exiting."
+            exit 0
+          fi
+          git commit -m "$pr_title"
+          git push -u origin "$branch_name"
+
+          gh pr create --title "$pr_title" --body "Auto-promote policy based on readiness signal." --base main
