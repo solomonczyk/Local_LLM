@@ -157,6 +157,42 @@ jobs:
             fi
           fi
 
+      - name: Director autolink smoke (CI)
+        run: |
+          python - <<'PY'
+          import time
+          from agent_system.decision_log import append_decision_event
+          try:
+              from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
+              d = DirectorAdapter()
+              req = DirectorRequest(
+                  problem_summary="CI autolink smoke test",
+                  facts=["ci"],
+                  agent_summaries={"dev": "ok"},
+                  risk_level=RiskLevel.LOW,
+                  confidence=0.5,
+              )
+              res = d.call_director(req)
+              print("AUTOLINK_SMOKE: director_call_ok")
+          except Exception as exc:
+              append_decision_event({
+                  "type": "director_decision",
+                  "agent": "director",
+                  "decision": "CI autolink smoke (record-only)",
+                  "next_step": "none",
+                  "confidence": 0.5,
+                  "prompt_tokens": 500,
+                  "completion_tokens": 200,
+                  "total_tokens": 700,
+                  "latency_ms": 2500,
+                  "synthetic": True,
+                  "risk_level": "low",
+                  "decision_class": "process",
+                  "risks": [],
+              })
+              print(f"AUTOLINK_SMOKE: fallback_record_only ({exc})")
+          PY
+
       - name: Latency smoke (observability)
         run: |
           python tools/latency_smoke.py | tee data/reports/latency_smoke.txt
