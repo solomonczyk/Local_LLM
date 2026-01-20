@@ -291,6 +291,7 @@ Focus on:
         messages[-1]["content"] = messages[-1]["content"][:12000]
 
         try:
+            t0 = time.perf_counter()
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -328,6 +329,7 @@ Focus on:
                     }
                 }
             )
+            latency_ms = int((time.perf_counter() - t0) * 1000)
             
             # Обновляем метрики
             usage = response.usage
@@ -374,6 +376,7 @@ Focus on:
                 "decision": decision,
                 "confidence": confidence,
                 "score": score,
+                "latency_ms": latency_ms,
                 "why_now": "unknown",
                 "what_to_fix": "unknown",
                 "risk_level": request.risk_level.value,
