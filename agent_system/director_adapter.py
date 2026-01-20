@@ -290,11 +290,23 @@ Focus on:
         ]
         messages[-1]["content"] = messages[-1]["content"][:12000]
         max_completion_tokens = 600
+        latency_policy = "OFF"
         if (
             os.getenv("LATENCY_MODE") == "CONSERVATIVE"
             and request.risk_level == RiskLevel.LOW
         ):
             max_completion_tokens = max_completion_tokens // 2
+            latency_policy = "CONSERVATIVE"
+            messages.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": (
+                        "You are in LATENCY_CONSERVATIVE mode. Be concise. "
+                        "Output only: (1) decision, (2) next_step. No extra explanation."
+                    ),
+                },
+            )
 
         try:
             t0 = time.perf_counter()
@@ -383,6 +395,7 @@ Focus on:
                 "confidence": confidence,
                 "score": score,
                 "latency_ms": latency_ms,
+                "latency_policy": latency_policy,
                 "why_now": "unknown",
                 "what_to_fix": "unknown",
                 "risk_level": request.risk_level.value,
