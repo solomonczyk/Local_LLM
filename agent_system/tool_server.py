@@ -73,6 +73,9 @@ class WriteFileRequest(BaseModel):
     path: str
     content: str
     mode: str = "overwrite"
+    dry_run: bool = False
+    expected_sha256: Optional[str] = None
+    expected_exists: Optional[bool] = None
 
 class ListDirRequest(BaseModel):
     path: str = "."
@@ -81,6 +84,8 @@ class ListDirRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     globs: Optional[List[str]] = None
+    max_results: Optional[int] = None
+    max_files: Optional[int] = None
 
 class GitRequest(BaseModel):
     cmd: str
@@ -96,19 +101,35 @@ class NetworkInfoRequest(BaseModel):
 
 class DeleteFileRequest(BaseModel):
     path: str
+    dry_run: bool = False
+    expected_sha256: Optional[str] = None
+    expected_exists: Optional[bool] = None
 
 class EditFileRequest(BaseModel):
     path: str
     old_text: str
     new_text: str
+    dry_run: bool = False
+    expected_sha256: Optional[str] = None
+    expected_exists: Optional[bool] = None
 
 class CopyFileRequest(BaseModel):
     source_path: str
     dest_path: str
+    dry_run: bool = False
+    expected_source_sha256: Optional[str] = None
+    expected_dest_sha256: Optional[str] = None
+    expected_source_exists: Optional[bool] = None
+    expected_dest_exists: Optional[bool] = None
 
 class MoveFileRequest(BaseModel):
     source_path: str
     dest_path: str
+    dry_run: bool = False
+    expected_source_sha256: Optional[str] = None
+    expected_dest_sha256: Optional[str] = None
+    expected_source_exists: Optional[bool] = None
+    expected_dest_exists: Optional[bool] = None
 
 class DatabaseConnectionRequest(BaseModel):
     name: str
@@ -169,7 +190,14 @@ async def read_file(request: ReadFileRequest, api_key: str = Depends(verify_api_
 @app.post("/tools/write_file")
 async def write_file(request: WriteFileRequest, api_key: str = Depends(verify_api_key)):
     """Запись файла"""
-    result = tool_executor.write_file(request.path, request.content, request.mode)
+    result = tool_executor.write_file(
+        request.path,
+        request.content,
+        request.mode,
+        request.dry_run,
+        request.expected_sha256,
+        request.expected_exists,
+    )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -185,7 +213,7 @@ async def list_dir(request: ListDirRequest, api_key: str = Depends(verify_api_ke
 @app.post("/tools/search")
 async def search(request: SearchRequest, api_key: str = Depends(verify_api_key)):
     """Поиск в файлах"""
-    result = tool_executor.search(request.query, request.globs)
+    result = tool_executor.search(request.query, request.globs, request.max_results, request.max_files)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -225,7 +253,7 @@ async def network_info(request: NetworkInfoRequest, api_key: str = Depends(verif
 @app.post("/tools/delete_file")
 async def delete_file(request: DeleteFileRequest, api_key: str = Depends(verify_api_key)):
     """Удаление файла"""
-    result = tool_executor.delete_file(request.path)
+    result = tool_executor.delete_file(request.path, request.dry_run, request.expected_sha256, request.expected_exists)
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -233,7 +261,14 @@ async def delete_file(request: DeleteFileRequest, api_key: str = Depends(verify_
 @app.post("/tools/edit_file")
 async def edit_file(request: EditFileRequest, api_key: str = Depends(verify_api_key)):
     """Редактирование файла"""
-    result = tool_executor.edit_file(request.path, request.old_text, request.new_text)
+    result = tool_executor.edit_file(
+        request.path,
+        request.old_text,
+        request.new_text,
+        request.dry_run,
+        request.expected_sha256,
+        request.expected_exists,
+    )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -241,7 +276,15 @@ async def edit_file(request: EditFileRequest, api_key: str = Depends(verify_api_
 @app.post("/tools/copy_file")
 async def copy_file(request: CopyFileRequest, api_key: str = Depends(verify_api_key)):
     """Копирование файла"""
-    result = tool_executor.copy_file(request.source_path, request.dest_path)
+    result = tool_executor.copy_file(
+        request.source_path,
+        request.dest_path,
+        request.dry_run,
+        request.expected_source_sha256,
+        request.expected_dest_sha256,
+        request.expected_source_exists,
+        request.expected_dest_exists,
+    )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -249,7 +292,15 @@ async def copy_file(request: CopyFileRequest, api_key: str = Depends(verify_api_
 @app.post("/tools/move_file")
 async def move_file(request: MoveFileRequest, api_key: str = Depends(verify_api_key)):
     """Перемещение/переименование файла"""
-    result = tool_executor.move_file(request.source_path, request.dest_path)
+    result = tool_executor.move_file(
+        request.source_path,
+        request.dest_path,
+        request.dry_run,
+        request.expected_source_sha256,
+        request.expected_dest_sha256,
+        request.expected_source_exists,
+        request.expected_dest_exists,
+    )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
