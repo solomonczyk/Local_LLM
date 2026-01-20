@@ -76,6 +76,13 @@ jobs:
             cat temporal.txt >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Policy guard (SOFT)
+        run: |
+          python tools/policy_guard.py | tee promote_gate.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat promote_gate.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Seed decision events for TREND (CI-only)
         run: |
           python - << 'PY'
@@ -252,6 +259,8 @@ jobs:
             data/reports/training_pack.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
+            promote_gate.txt
+            temporal.txt
           if-no-files-found: ignore
 
   security-check:
