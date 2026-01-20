@@ -157,6 +157,18 @@ jobs:
             fi
           fi
 
+      - name: Append intelligence timeline
+        run: |
+          python tools/append_intelligence_timeline.py
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            if [ -f data/reports/intelligence_timeline.jsonl ]; then
+              N=$(wc -l < data/reports/intelligence_timeline.jsonl | tr -d ' ')
+              echo "INTEL_TIMELINE: lines=$N" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "INTEL_TIMELINE: lines=0" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
       - name: Director autolink smoke (CI)
         run: |
           python - <<'PY'
@@ -223,6 +235,7 @@ jobs:
             data/reports/decision_trend.txt
             data/reports/remediation_plan.json
             data/reports/intelligence_manifest.json
+            data/reports/intelligence_timeline.jsonl
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
           if-no-files-found: ignore
