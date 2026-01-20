@@ -43,36 +43,22 @@ jobs:
 
           verdict="unknown"
           if [ -f "$VERDICT_FILE" ]; then
-            verdict=$(python - <<'PY'
-import json
-d=json.load(open("data/reports/consilium_verdict.json","r",encoding="utf-8"))
-r=d.get("director_result", d)
-if isinstance(r,str):
-    print(r)
-elif isinstance(r,dict):
-    v = r.get("decision") or r.get("recommended_action") or r.get("action")
-    if not v and isinstance(r.get("result"), dict):
-        rr = r["result"]
-        v = rr.get("decision") or rr.get("recommended_action") or rr.get("action")
-    print(v or "unknown")
-else:
-    print("unknown")
-PY
-)
+            verdict=$(python -c "import json; d=json.load(open('$VERDICT_FILE','r',encoding='utf-8')); r=d.get('director_result', d); \
+print(r if isinstance(r,str) else (r.get('decision') or r.get('recommended_action') or r.get('action') or (r.get('result',{}) or {}).get('decision') or 'unknown'))")
           fi
 
           echo "HARD_GATES: verdict=$verdict"
 
-          echo "$verdict" | grep -qi "hold" && {
-            echo "HARD_GATES_FAIL: director verdict contains HOLD"
+          echo \"$verdict\" | grep -qi \"hold\" && {
+            echo \"HARD_GATES_FAIL: director verdict contains HOLD\"
             exit 1
           } || true
 
-          if [ -f "$DASHBOARD_FILE" ]; then
-            if grep -qi "TEMPORAL_GATE: SOFT" "$DASHBOARD_FILE"; then
-              echo "HARD_GATES_FAIL: TEMPORAL_GATE is SOFT"
+          if [ -f \"$DASHBOARD_FILE\" ]; then
+            if grep -qi \"TEMPORAL_GATE: SOFT\" \"$DASHBOARD_FILE\"; then
+              echo \"HARD_GATES_FAIL: TEMPORAL_GATE is SOFT\"
               exit 1
             fi
           fi
 
-          echo "HARD_GATES_PASS"
+          echo \"HARD_GATES_PASS\"
