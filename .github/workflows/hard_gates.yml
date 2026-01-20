@@ -37,7 +37,26 @@ jobs:
 
           verdict="unknown"
           if [ -f "$verdict_file" ]; then
-            verdict=$(python -c "import json; d=json.load(open('$verdict_file','r',encoding='utf-8')); r=d.get('director_result',{}); print((r.get('decision') or r.get('recommended_action') or r.get('action') or 'unknown'))")
+            verdict=$(python - <<'PY'
+import json
+p="data/reports/consilium_verdict.json"
+d=json.load(open(p,"r",encoding="utf-8"))
+r=d.get("director_result", d)
+# director_result может быть строкой/словарём/вложенным словарём
+if isinstance(r,str):
+    print(r)
+elif isinstance(r,dict):
+    # пробуем типовые поля
+    v = r.get("decision") or r.get("recommended_action") or r.get("action")
+    # иногда решение может лежать глубже
+    if not v and isinstance(r.get("result"), dict):
+        rr = r["result"]
+        v = rr.get("decision") or rr.get("recommended_action") or rr.get("action")
+    print(v or "unknown")
+else:
+    print("unknown")
+PY
+            )
           fi
 
           echo "HARD_GATES: verdict=$verdict"
