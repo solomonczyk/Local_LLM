@@ -60,6 +60,19 @@ class TestFileTools(unittest.TestCase):
         self.assertEqual(result["content"], test_content)
         self.assertIn("test.txt", result["path"])
 
+    def test_read_file_normalizes_backslash(self) -> None:
+        """Test reading with Windows-style backslashes"""
+        nested_dir = Path(self.temp_dir) / "nested"
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        test_file = nested_dir / "note.txt"
+        test_content = "Backslash path"
+        test_file.write_text(test_content, encoding="utf-8")
+
+        result = self.file_tools.read_file("nested\\note.txt")
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["content"], test_content)
+
     def test_read_file_not_found(self) -> None:
         """Test reading non-existent file"""
         result = self.file_tools.read_file("nonexistent.txt")
@@ -82,6 +95,20 @@ class TestFileTools(unittest.TestCase):
         test_file = Path(self.temp_dir) / "new_file.txt"
         self.assertTrue(test_file.exists())
         self.assertEqual(test_file.read_text(encoding="utf-8"), test_content)
+
+    def test_write_file_dry_run(self) -> None:
+        """Test write dry-run preview without file creation"""
+        test_content = "Dry run content"
+        target = Path(self.temp_dir) / "dry_run.txt"
+
+        with patch('agent_system.file_tools.AgentConfig.CURRENT_ACCESS_LEVEL', 3), \
+             patch('agent_system.file_tools.AgentConfig.ACCESS_LEVEL_SAFE_WRITE', 3):
+            result = self.file_tools.write_file("dry_run.txt", test_content, dry_run=True)
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["dry_run"])
+        self.assertFalse(target.exists())
+        self.assertIn("diff", result)
 
     def test_write_file_permission_denied(self) -> None:
         """Test writing with insufficient permissions"""
@@ -110,6 +137,20 @@ class TestFileTools(unittest.TestCase):
         backup_file = Path(self.temp_dir) / "to_delete.txt.deleted_backup"
         self.assertTrue(backup_file.exists())
 
+    def test_delete_file_dry_run(self) -> None:
+        """Test delete dry-run preview without file deletion"""
+        test_file = Path(self.temp_dir) / "delete_dry.txt"
+        test_file.write_text("Delete me", encoding="utf-8")
+
+        with patch('agent_system.file_tools.AgentConfig.CURRENT_ACCESS_LEVEL', 3), \
+             patch('agent_system.file_tools.AgentConfig.ACCESS_LEVEL_SAFE_WRITE', 3):
+            result = self.file_tools.delete_file("delete_dry.txt", dry_run=True)
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(test_file.exists())
+        self.assertIn("preview", result)
+
     def test_edit_file_success(self) -> None:
         """Test successful file editing"""
         # Create test file
@@ -130,6 +171,21 @@ class TestFileTools(unittest.TestCase):
         # Check backup was created
         backup_file = Path(self.temp_dir) / "edit_test.txt.backup"
         self.assertTrue(backup_file.exists())
+
+    def test_edit_file_dry_run(self) -> None:
+        """Test edit dry-run preview without file modification"""
+        test_file = Path(self.temp_dir) / "edit_dry.txt"
+        original_content = "Hello World"
+        test_file.write_text(original_content, encoding="utf-8")
+
+        with patch('agent_system.file_tools.AgentConfig.CURRENT_ACCESS_LEVEL', 3), \
+             patch('agent_system.file_tools.AgentConfig.ACCESS_LEVEL_SAFE_WRITE', 3):
+            result = self.file_tools.edit_file("edit_dry.txt", "World", "Universe", dry_run=True)
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(test_file.read_text(encoding="utf-8"), original_content)
+        self.assertIn("diff", result)
 
     def test_list_dir_success(self) -> None:
         """Test successful directory listing"""
