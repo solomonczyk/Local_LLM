@@ -1,0 +1,56 @@
+name: Hard Gates
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  hard-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate reports (if pipeline exists)
+        run: |
+          mkdir -p data/reports
+          if [ -f tools/decision_dashboard.py ]; then
+            python tools/decision_dashboard.py --out data/reports/dashboard_daily.md || true
+          fi
+          if [ -f tools/consilium_to_director.py ]; then
+            python tools/consilium_to_director.py || true
+          fi
+
+      - name: Enforce hard gates
+        run: |
+          set -e
+          verdict_file="data/reports/consilium_verdict.json"
+          dashboard_file="data/reports/dashboard_daily.md"
+
+          verdict="unknown"
+          if [ -f "$verdict_file" ]; then
+            verdict=$(python -c "import json; d=json.load(open('$verdict_file','r',encoding='utf-8')); r=d.get('director_result',{}); print((r.get('decision') or r.get('recommended_action') or r.get('action') or 'unknown'))")
+          fi
+
+          echo "HARD_GATES: verdict=$verdict"
+
+          # Fail on HOLD (hard escalation)
+          echo "$verdict" | grep -qi "hold" && { echo "HARD_GATES_FAIL: director verdict contains HOLD"; exit 1; } || true
+
+          # Fail on TEMPORAL_GATE SOFT signals found in dashboard
+          if [ -f "$dashboard_file" ]; then
+            if grep -qi "TEMPORAL_GATE: SOFT" "$dashboard_file"; then
+              echo "HARD_GATES_FAIL: TEMPORAL_GATE is SOFT in dashboard"
+              exit 1
+            fi
+          fi
+
+          echo "HARD_GATES_PASS"
