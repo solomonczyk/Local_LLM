@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from agent_system.decision_log import append_decision_event
+
 LOG = Path("data/decision_events.log")
 POLICY_RULES_PATH = Path("tools/policy_rules.json")
 MIN_EVENTS = 5
@@ -266,11 +267,7 @@ def main() -> None:
                 if line.startswith("RCA_BAD_SAMPLE_KEYS:") or line.startswith("RCA_BAD_SAMPLE_AGENT:"):
                     print(line)
             summary_line = next(
-                (
-                    line
-                    for line in result.stdout.splitlines()
-                    if line.startswith("SUMMARY_JSON: ")
-                ),
+                (line for line in result.stdout.splitlines() if line.startswith("SUMMARY_JSON: ")),
                 None,
             )
             if not summary_line:
@@ -278,21 +275,13 @@ def main() -> None:
             summary = json.loads(summary_line.replace("SUMMARY_JSON: ", "", 1))
             summary["window_minutes"] = window
             adaptive_line = next(
-                (
-                    line
-                    for line in result.stdout.splitlines()
-                    if line.startswith("ADAPTIVE_THRESHOLD:")
-                ),
+                (line for line in result.stdout.splitlines() if line.startswith("ADAPTIVE_THRESHOLD:")),
                 None,
             )
             if adaptive_line:
                 summary["adaptive_threshold_line"] = adaptive_line
             adaptive_status_line = next(
-                (
-                    line
-                    for line in result.stdout.splitlines()
-                    if line.startswith("ADAPTIVE_STATUS:")
-                ),
+                (line for line in result.stdout.splitlines() if line.startswith("ADAPTIVE_STATUS:")),
                 None,
             )
             if adaptive_status_line:
@@ -302,11 +291,7 @@ def main() -> None:
                 result_off = subprocess.run(cmd_off, capture_output=True, text=True)
                 exit_codes.append(result_off.returncode)
                 summary_line_off = next(
-                    (
-                        line
-                        for line in result_off.stdout.splitlines()
-                        if line.startswith("SUMMARY_JSON: ")
-                    ),
+                    (line for line in result_off.stdout.splitlines() if line.startswith("SUMMARY_JSON: ")),
                     None,
                 )
                 if not summary_line_off:
@@ -362,21 +347,15 @@ def main() -> None:
         known_agents = ["director", "architect", "qa", "security", "dev", "unknown"]
         extra_agents = sorted(key for key in rca_agents.keys() if key not in known_agents)
         agent_keys = known_agents + extra_agents
-        print(
-            "RCA_BAD_BY_AGENT: "
-            + " ".join(f"{key}={rca_agents.get(key, 0)}" for key in agent_keys)
-        )
+        print("RCA_BAD_BY_AGENT: " + " ".join(f"{key}={rca_agents.get(key, 0)}" for key in agent_keys))
         rca_director = summaries[0].get("rca_bad_by_class_director", {}) if summaries else {}
         print(
             "RCA_BAD_BY_CLASS_DIRECTOR: "
             + " ".join(
-                f"{key}={rca_director.get(key, 0)}"
-                for key in ["process", "infra", "security", "product", "unknown"]
+                f"{key}={rca_director.get(key, 0)}" for key in ["process", "infra", "security", "product", "unknown"]
             )
         )
-        rca_penalty_director_process = (
-            summaries[0].get("rca_bad_penalty_director_process", {}) if summaries else {}
-        )
+        rca_penalty_director_process = summaries[0].get("rca_bad_penalty_director_process", {}) if summaries else {}
         print(
             "RCA_BAD_PENALTY_DIRECTOR_PROCESS: "
             + " ".join(
@@ -392,18 +371,18 @@ def main() -> None:
             f"bad_agent_field_present={rca_debug.get('bad_agent_field_present', 0)}"
         )
         if summaries:
-            shadow_count = summaries[0].get("shadow_policy_candidates", {}).get(
-                "director_regressions_soften_v2",
-                0,
+            shadow_count = (
+                summaries[0]
+                .get("shadow_policy_candidates", {})
+                .get(
+                    "director_regressions_soften_v2",
+                    0,
+                )
             )
             print(f"SHADOW_POLICY_CANDIDATES: director_regressions_soften_v2={shadow_count}")
             policy_dependency = summaries[0].get("policy_sensitivity", {}).get("policy_dependency")
             drift_status = summary_multi.get("drift_status")
-            v2_ready = (
-                shadow_count >= 5
-                and policy_dependency == "LOW"
-                and drift_status == "OK"
-            )
+            v2_ready = shadow_count >= 5 and policy_dependency == "LOW" and drift_status == "OK"
             summary_multi["shadow"] = {
                 "candidates": {"director_regressions_soften_v2": shadow_count},
                 "ready": {"director_regressions_soften_v2": v2_ready},
@@ -415,9 +394,7 @@ def main() -> None:
                 "drift_status": drift_status,
                 "policy_dependency": policy_dependency,
             }
-            summary_multi["shadow_history"] = {
-                "director_regressions_soften_v2": shadow_entry
-            }
+            summary_multi["shadow_history"] = {"director_regressions_soften_v2": shadow_entry}
             print(f"SHADOW_POLICY_READY: director_regressions_soften_v2={str(v2_ready).lower()}")
             rollback_suggested = False
             for summary in summaries:
@@ -431,9 +408,7 @@ def main() -> None:
                 rollback_suggested = True
             print(f"ROLLBACK_SUGGESTED: {str(rollback_suggested).lower()}")
             feedback_line = "ROLLBACK_FEEDBACK: none"
-            if pressure_high and any(
-                summary.get("trend_status") == "FAIL" for summary in summaries
-            ):
+            if pressure_high and any(summary.get("trend_status") == "FAIL" for summary in summaries):
                 feedback_line = "ROLLBACK_FEEDBACK: QUALITY_DEGRADATION_CONFIRMED"
                 print(feedback_line)
             else:
@@ -445,7 +420,7 @@ def main() -> None:
                     f"policy={POLICY_VERSION} "
                     "action=disable_in_policy_rules_json "
                     "branch=auto/policy-rollback "
-                    f"title=\"Rollback {POLICY_VERSION}\""
+                    f'title="Rollback {POLICY_VERSION}"'
                 )
                 rollback_plan_path.parent.mkdir(parents=True, exist_ok=True)
                 rollback_plan = {
@@ -584,26 +559,20 @@ def main() -> None:
                     continue
             history.append(shadow_entry)
             last_five = history[-5:]
-            auto_promote_ready = (
-                len(last_five) == 5
-                and all(
-                    entry.get("ready") is True
-                    and entry.get("drift_status") == "OK"
-                    and entry.get("policy_dependency") == "LOW"
-                    for entry in last_five
-                )
+            auto_promote_ready = len(last_five) == 5 and all(
+                entry.get("ready") is True
+                and entry.get("drift_status") == "OK"
+                and entry.get("policy_dependency") == "LOW"
+                for entry in last_five
             )
-            print(
-                "AUTO_PROMOTE_READY: "
-                f"director_regressions_soften_v2={str(auto_promote_ready).lower()}"
-            )
+            print("AUTO_PROMOTE_READY: " f"director_regressions_soften_v2={str(auto_promote_ready).lower()}")
             if auto_promote_ready:
                 print(
                     "AUTO_PROMOTE_PLAN: "
                     "policy=director_regressions_soften_v2 "
                     "action=enable_in_policy_rules_json "
                     "branch=auto/policy-promote-v2 "
-                    "title=\"Promote director_regressions_soften_v2\""
+                    'title="Promote director_regressions_soften_v2"'
                 )
             else:
                 print("AUTO_PROMOTE_PLAN: none")
@@ -671,11 +640,7 @@ def main() -> None:
     if args.grace is None and isinstance(defaults, dict) and "grace" in defaults:
         args.grace = defaults.get("grace")
     policy_enabled = not args.policy_off
-    enabled_list = [
-        f"{key}:{bool(value.get('enabled'))}"
-        for key, value in policy_rules.items()
-        if key != "defaults"
-    ]
+    enabled_list = [f"{key}:{bool(value.get('enabled'))}" for key, value in policy_rules.items() if key != "defaults"]
     print(
         f"POLICY_LOADED: keys={list(policy_rules.keys())} "
         f"enabled={enabled_list} path={POLICY_RULES_PATH.as_posix()}"
@@ -890,11 +855,7 @@ def main() -> None:
                     policy_apply_debugged = True
             else:
                 event["effective_score"] = score_before_policy
-            if (
-                args.debug_mitigated
-                and not mitigated_debugged
-                and penalty_reason == "regressions_mitigated"
-            ):
+            if args.debug_mitigated and not mitigated_debugged and penalty_reason == "regressions_mitigated":
                 print(
                     "MITIGATED_SAMPLE: "
                     f"event_id={event.get('event_id')} "
@@ -915,9 +876,7 @@ def main() -> None:
     kept_events = filtered
     stats["kept"] = len(kept_events)
     count_for_min_required = len(kept_events)
-    events_for_scoring = [
-        event for event in kept_events if event.get("synthetic") is not True
-    ]
+    events_for_scoring = [event for event in kept_events if event.get("synthetic") is not True]
     events = events_for_scoring
     if args.debug_window:
         for event in events:
@@ -967,10 +926,7 @@ def main() -> None:
     raw_avg = sum(raw_scores) / len(raw_scores) if raw_scores else None
     raw_avg_value = f"{raw_avg:.6f}" if raw_avg is not None else "NA"
     print(f"AVG_DEBUG: raw_avg={raw_avg_value} effective_avg={avg_for_trend:.6f}")
-    print(
-        f"DECISION_TREND last={len(effective_scores)} avg={avg_for_trend:.3f} "
-        f"min={mn:.3f} max={mx:.3f}"
-    )
+    print(f"DECISION_TREND last={len(effective_scores)} avg={avg_for_trend:.3f} " f"min={mn:.3f} max={mx:.3f}")
     if args.fail_below_avg is not None or args.print_bad_penalties:
         base_threshold = args.fail_below_avg if args.fail_below_avg is not None else 0.6
         high_risk_count = 0
@@ -1063,10 +1019,7 @@ def main() -> None:
         delta = effective_threshold - prev_effective
         status = "STABLE" if abs(delta) < 1e-9 else "CHANGED"
         delta_str = f"{delta:+.2f}"
-        print(
-            "ADAPTIVE_STABILITY: "
-            f"{status} (effective={effective_threshold:.2f} delta={delta_str})"
-        )
+        print("ADAPTIVE_STABILITY: " f"{status} (effective={effective_threshold:.2f} delta={delta_str})")
         adaptive_status_line = (
             "ADAPTIVE_STATUS: "
             f"guard={adaptive_guard_status} "
@@ -1086,6 +1039,7 @@ def main() -> None:
             if avg_value < threshold_value:
                 return "WARN"
             return "PASS"
+
         base_status = classify_threshold(avg_for_trend, base_threshold, grace)
         effective_status = classify_threshold(avg_for_trend, threshold, grace)
         impact = "none"
@@ -1095,12 +1049,8 @@ def main() -> None:
         min_required = args.min_count or MIN_EVENTS
         if count_for_min_required < min_required:
             trend_status = "INSUFFICIENT_DATA"
-            print(
-                f"TREND: {trend_status} (count={count_for_min_required}, min_required={min_required})"
-            )
-            counts_line = "BUCKET_COUNTS: " + " ".join(
-                f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits
-            )
+            print(f"TREND: {trend_status} (count={count_for_min_required}, min_required={min_required})")
+            counts_line = "BUCKET_COUNTS: " + " ".join(f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits)
             print(counts_line)
             print(
                 "WHY_DROPPED: "
@@ -1133,8 +1083,8 @@ def main() -> None:
                         next_step = str(event.get("next_step", ""))
                         print("BAD_SAMPLE:")
                         print(f"score={score} confidence={confidence}")
-                        print(f"decision=\"{decision}\"")
-                        print(f"next_step=\"{next_step}\"")
+                        print(f'decision="{decision}"')
+                        print(f'next_step="{next_step}"')
                         print("---")
                         samples += 1
                         if samples >= args.print_bad_samples:
@@ -1149,10 +1099,7 @@ def main() -> None:
                 if penalty_counts:
                     print(
                         "RCA_BAD_PENALTY: "
-                        + " ".join(
-                            f"{key}={penalty_counts.get(key, 0)}"
-                            for key in sorted(penalty_counts.keys())
-                        )
+                        + " ".join(f"{key}={penalty_counts.get(key, 0)}" for key in sorted(penalty_counts.keys()))
                     )
                 else:
                     print("RCA_BAD_PENALTY: none")
@@ -1174,9 +1121,7 @@ def main() -> None:
                     "since_minutes": args.since_minutes,
                     "exclude_class": args.exclude_class,
                     "min_count": min_required,
-                    "insufficient_reason": (
-                        f"total({count_for_min_required}) < min_count({min_required})"
-                    ),
+                    "insufficient_reason": (f"total({count_for_min_required}) < min_count({min_required})"),
                     "max_risk_level": max_risk_level,
                     "shadow_policy_candidates": {
                         "director_regressions_soften_v2": shadow_counts["director_regressions_soften_v2"]
@@ -1212,10 +1157,7 @@ def main() -> None:
         mitigated_counts_director_process = {"regressions_mitigated": 0, "regressions": 0}
         if events:
             for event in events:
-                if (
-                    event.get("agent") == "director"
-                    and event.get("decision_class") == "process"
-                ):
+                if event.get("agent") == "director" and event.get("decision_class") == "process":
                     penalty_bucket = event.get("penalty_reason")
                     if penalty_bucket in mitigated_counts_director_process:
                         mitigated_counts_director_process[penalty_bucket] += 1
@@ -1232,17 +1174,12 @@ def main() -> None:
                         key = why_now.strip()
                         bad_by_why_now[key] = bad_by_why_now.get(key, 0) + 1
                     what_to_fix = event.get("what_to_fix")
-                    if (
-                        isinstance(what_to_fix, str)
-                        and what_to_fix.strip()
-                        and what_to_fix != "unknown"
-                    ):
+                    if isinstance(what_to_fix, str) and what_to_fix.strip() and what_to_fix != "unknown":
                         key = what_to_fix.strip()
                         bad_by_what_to_fix[key] = bad_by_what_to_fix.get(key, 0) + 1
                     if penalty_sample is None:
                         penalty_sample = (
-                            f"PENALTY_SAMPLE: event_id={event.get('event_id')} "
-                            f"penalty_reason={penalty_reason}"
+                            f"PENALTY_SAMPLE: event_id={event.get('event_id')} " f"penalty_reason={penalty_reason}"
                         )
                     if penalty_reason == "regressions":
                         confidence = event.get("confidence")
@@ -1257,8 +1194,8 @@ def main() -> None:
                             print(
                                 "REGRESSIONS_BAD_SAMPLE: "
                                 f"event_id={event.get('event_id')} "
-                                f"decision=\"{decision}\" "
-                                f"next_step=\"{next_step}\""
+                                f'decision="{decision}" '
+                                f'next_step="{next_step}"'
                             )
                             regressions_samples += 1
                     reason_text = extract_reason_text(event)
@@ -1277,10 +1214,7 @@ def main() -> None:
                         and event.get("agent") is None
                         and missing_agent_samples < args.debug_sample_missing_agent
                     ):
-                        print(
-                            "MISSING_AGENT_SAMPLE: "
-                            f"type={event.get('type')} keys={sorted(event.keys())}"
-                        )
+                        print("MISSING_AGENT_SAMPLE: " f"type={event.get('type')} keys={sorted(event.keys())}")
                         missing_agent_samples += 1
                         break
                     agent_value = event.get("agent", "unknown")
@@ -1289,46 +1223,33 @@ def main() -> None:
                     rca_bad_by_agent[agent_value] = rca_bad_by_agent.get(agent_value, 0) + 1
                     if agent_value == "director":
                         director_class = event.get("decision_class") or "unknown"
-                        rca_bad_by_class_director[director_class] = (
-                            rca_bad_by_class_director.get(director_class, 0) + 1
-                        )
+                        rca_bad_by_class_director[director_class] = rca_bad_by_class_director.get(director_class, 0) + 1
                         if director_class == "process":
                             penalty_value = event.get("penalty_reason") or "missing"
                             rca_bad_penalty_director_process[penalty_value] = (
                                 rca_bad_penalty_director_process.get(penalty_value, 0) + 1
                             )
-        root_cause = "ROOT_CAUSE: " + " ".join(
-            f"{key}={bad_by_class[key]}" for key in sorted(bad_by_class.keys())
-        ) if bad_by_class else "ROOT_CAUSE: none"
-        ordered_classes = ["process", "infra", "security", "product", "legacy_unknown"]
-        bad_by_class_line = "BAD_BY_CLASS: " + " ".join(
-            f"{key}={bad_by_class.get(key, 0)}" for key in ordered_classes
+        root_cause = (
+            "ROOT_CAUSE: " + " ".join(f"{key}={bad_by_class[key]}" for key in sorted(bad_by_class.keys()))
+            if bad_by_class
+            else "ROOT_CAUSE: none"
         )
-        top_bad_reasons = sorted(
-            bad_reason_tokens.items(),
-            key=lambda item: (-item[1], item[0])
-        )[:3]
+        ordered_classes = ["process", "infra", "security", "product", "legacy_unknown"]
+        bad_by_class_line = "BAD_BY_CLASS: " + " ".join(f"{key}={bad_by_class.get(key, 0)}" for key in ordered_classes)
+        top_bad_reasons = sorted(bad_reason_tokens.items(), key=lambda item: (-item[1], item[0]))[:3]
         bad_reasons_line = (
-            "BAD_REASONS_TOP3: "
-            + " ".join(f"{token}({count})" for token, count in top_bad_reasons)
+            "BAD_REASONS_TOP3: " + " ".join(f"{token}({count})" for token, count in top_bad_reasons)
             if top_bad_reasons
             else "BAD_REASONS_TOP3: none"
         )
-        penalty_counts_line = (
-            "PENALTY_COUNTS_BAD: "
-            + " ".join(
-                f"{key}={penalty_counts.get(key, 0)}"
-                for key in ["regressions", "coverage", "insufficient", "other"]
-            )
+        penalty_counts_line = "PENALTY_COUNTS_BAD: " + " ".join(
+            f"{key}={penalty_counts.get(key, 0)}" for key in ["regressions", "coverage", "insufficient", "other"]
         )
         if args.print_bad_penalties:
             if penalty_counts:
                 print(
                     "RCA_BAD_PENALTY: "
-                    + " ".join(
-                        f"{key}={penalty_counts.get(key, 0)}"
-                        for key in sorted(penalty_counts.keys())
-                    )
+                    + " ".join(f"{key}={penalty_counts.get(key, 0)}" for key in sorted(penalty_counts.keys()))
                 )
             else:
                 print("RCA_BAD_PENALTY: none")
@@ -1343,20 +1264,20 @@ def main() -> None:
             f"{key}={rca_bad_by_class_director.get(key, 0)}" for key in director_class_keys
         )
         penalty_keys = ["regressions", "coverage", "insufficient", "other", "missing"]
-        rca_bad_penalty_director_process_line = (
-            "RCA_BAD_PENALTY_DIRECTOR_PROCESS: "
-            + " ".join(
-                f"{key}={rca_bad_penalty_director_process.get(key, 0)}" for key in penalty_keys
-            )
+        rca_bad_penalty_director_process_line = "RCA_BAD_PENALTY_DIRECTOR_PROCESS: " + " ".join(
+            f"{key}={rca_bad_penalty_director_process.get(key, 0)}" for key in penalty_keys
         )
-        rca_bad_why_now_line = "RCA_BAD_WHY_NOW: " + " ".join(
-            f"{key}={bad_by_why_now[key]}"
-            for key in sorted(bad_by_why_now.keys())
-        ) if bad_by_why_now else "RCA_BAD_WHY_NOW: none"
-        rca_bad_what_to_fix_line = "RCA_BAD_WHAT_TO_FIX: " + " ".join(
-            f"{key}={bad_by_what_to_fix[key]}"
-            for key in sorted(bad_by_what_to_fix.keys())
-        ) if bad_by_what_to_fix else "RCA_BAD_WHAT_TO_FIX: none"
+        rca_bad_why_now_line = (
+            "RCA_BAD_WHY_NOW: " + " ".join(f"{key}={bad_by_why_now[key]}" for key in sorted(bad_by_why_now.keys()))
+            if bad_by_why_now
+            else "RCA_BAD_WHY_NOW: none"
+        )
+        rca_bad_what_to_fix_line = (
+            "RCA_BAD_WHAT_TO_FIX: "
+            + " ".join(f"{key}={bad_by_what_to_fix[key]}" for key in sorted(bad_by_what_to_fix.keys()))
+            if bad_by_what_to_fix
+            else "RCA_BAD_WHAT_TO_FIX: none"
+        )
         priority_entries = []
         if bad > 0 and bad_by_what_to_fix:
             for key, count in bad_by_what_to_fix.items():
@@ -1384,8 +1305,7 @@ def main() -> None:
         )
         policy_applied_line = f"POLICY_APPLIED: {POLICY_VERSION} count={policy_applied}"
         policy_applied_all_line = "POLICY_APPLIED_ALL: " + " ".join(
-            f"{key}={policy_applied_counts.get(key, 0)}"
-            for key in sorted(policy_applied_counts.keys())
+            f"{key}={policy_applied_counts.get(key, 0)}" for key in sorted(policy_applied_counts.keys())
         )
         policy_delta_capped_line = (
             "POLICY_DELTA_CAPPED: "
@@ -1427,9 +1347,7 @@ def main() -> None:
             print(f"SOFTEN_APPLIED: {soften_applied}")
             if penalty_sample:
                 print(penalty_sample)
-            counts_line = "BUCKET_COUNTS: " + " ".join(
-                f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits
-            )
+            counts_line = "BUCKET_COUNTS: " + " ".join(f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits)
             print(counts_line)
             print(
                 "WHY_DROPPED: "
@@ -1485,15 +1403,14 @@ def main() -> None:
                         "bad_total": bad,
                         "bad_agent_field_present": bad_agent_field_present,
                     },
-                "rca_bad_by_agent": rca_bad_by_agent,
-                "rca_bad_by_class_director": rca_bad_by_class_director,
-                "rca_bad_penalty_director_process": rca_bad_penalty_director_process,
-                "rca_action_priority_line": (
-                    None if rca_action_priority_line == "RCA_ACTION_PRIORITY: none"
-                    else rca_action_priority_line
-                ),
-                "retrofill_applied": retrofill_applied,
-            }
+                    "rca_bad_by_agent": rca_bad_by_agent,
+                    "rca_bad_by_class_director": rca_bad_by_class_director,
+                    "rca_bad_penalty_director_process": rca_bad_penalty_director_process,
+                    "rca_action_priority_line": (
+                        None if rca_action_priority_line == "RCA_ACTION_PRIORITY: none" else rca_action_priority_line
+                    ),
+                    "retrofill_applied": retrofill_applied,
+                }
                 print(f"SUMMARY_JSON: {json.dumps(summary, ensure_ascii=False)}")
             maybe_exit(2)
             return
@@ -1529,9 +1446,7 @@ def main() -> None:
             print(f"SOFTEN_APPLIED: {soften_applied}")
         if penalty_sample:
             print(penalty_sample)
-        counts_line = "BUCKET_COUNTS: " + " ".join(
-            f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits
-        )
+        counts_line = "BUCKET_COUNTS: " + " ".join(f"{limit}m={bucket_counts[limit]}" for limit in bucket_limits)
         print(counts_line)
         print(
             "WHY_DROPPED: "
@@ -1591,8 +1506,7 @@ def main() -> None:
                 "rca_bad_by_class_director": rca_bad_by_class_director,
                 "rca_bad_penalty_director_process": rca_bad_penalty_director_process,
                 "rca_action_priority_line": (
-                    None if rca_action_priority_line == "RCA_ACTION_PRIORITY: none"
-                    else rca_action_priority_line
+                    None if rca_action_priority_line == "RCA_ACTION_PRIORITY: none" else rca_action_priority_line
                 ),
                 "retrofill_applied": retrofill_applied,
             }
