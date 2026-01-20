@@ -34,7 +34,9 @@ jobs:
           if [ -f tools/consilium_to_director.py ]; then
             python tools/consilium_to_director.py || true
           fi
-          if [ -f tools/temporal_escalation.py ]; then python tools/temporal_escalation.py | tee data/reports/temporal_escalation.txt; fi
+          if [ -f tools/temporal_escalation.py ]; then
+            python tools/temporal_escalation.py > data/reports/temporal_escalation.txt
+          fi
 
       - name: Enforce hard gates
         run: |
