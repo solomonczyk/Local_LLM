@@ -46,8 +46,18 @@ jobs:
 
           verdict="unknown"
           if [ -f "$VERDICT_FILE" ]; then
-            verdict=$(python -c "import json; d=json.load(open('$VERDICT_FILE','r',encoding='utf-8')); r=d.get('director_result', d); \
-print(r if isinstance(r,str) else (r.get('decision') or r.get('recommended_action') or r.get('action') or (r.get('result',{}) or {}).get('decision') or 'unknown'))")
+            verdict=$(python <<'PY'
+import json
+d=json.load(open("data/reports/consilium_verdict.json","r",encoding="utf-8"))
+r=d.get("director_result", d)
+if isinstance(r,str):
+    print(r)
+elif isinstance(r,dict):
+    print(r.get("decision") or r.get("recommended_action") or r.get("action") or (r.get("result",{}) or {}).get("decision") or "unknown")
+else:
+    print("unknown")
+PY
+)
           fi
 
           echo "HARD_GATES: verdict=$verdict"
