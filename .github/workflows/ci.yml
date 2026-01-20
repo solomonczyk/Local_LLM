@@ -100,6 +100,7 @@ jobs:
               "decision": f"CI seed decision #{len(existing)+i+1}",
               "confidence": 0.85,
               "score": 0.85,
+              "latency_ms": 2500,
               "risk_level": "LOW",
               "decision_class": "process",
               "risks": [],
