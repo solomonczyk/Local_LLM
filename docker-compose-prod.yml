@@ -1,12 +1,11 @@
-﻿
 services:
   postgres:
     image: postgres:14-alpine
     container_name: agent-postgres
     environment:
-      POSTGRES_DB: agent_memory
-      POSTGRES_USER: agent_user
-      POSTGRES_PASSWORD: agent_password
+      POSTGRES_DB: ${POSTGRES_DB:-agent_memory}
+      POSTGRES_USER: ${POSTGRES_USER:-agent_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=ru_RU.UTF-8 --lc-ctype=ru_RU.UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -17,29 +16,69 @@ services:
       - agent-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agent_user -d agent_memory"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent_user} -d ${POSTGRES_DB:-agent_memory}"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: agent-llm
+    command:
+      - "-m"
+      - "/models/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+      - "-c"
+      - "4096"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+    volumes:
+      - ./models:/models:ro
+    ports:
+      - "8004:8000"
+    networks:
+      - agent-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
 
   agent-system:
     image: agent-system_agent-system:latest
     container_name: agent-system
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: agent_memory
-      POSTGRES_USER: agent_user
-      POSTGRES_PASSWORD: agent_password
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-agent_memory}
+      POSTGRES_USER: ${POSTGRES_USER:-agent_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      LLM_SERVER_IMPL: ${LLM_SERVER_IMPL:-serve_proxy.py}
+      LLM_PROXY_V1: ${LLM_PROXY_V1:-http://llm:8000/v1}
+      AGENT_LLM_URL: ${AGENT_LLM_URL:-http://llm:8000/v1}
+      AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-qwen2.5-coder-1.5b-instruct}
+      LLM_BASE: ${LLM_BASE:-http://llm:8000}
+
+      # Fail-fast controls (recommended)
+      LLM_STRICT_STARTUP: ${LLM_STRICT_STARTUP:-true}
+      ALLOW_MOCK_LLM: ${ALLOW_MOCK_LLM:-false}
+
+      # Agent configuration
       CONSILIUM_MODE: STANDARD
       KB_TOP_K: 5
       KB_MAX_CHARS: 8000
+
+      # Security
       AGENT_ACCESS_LEVEL: 2
-      OPENAI_API_KEY: 
-      # Hybrid Architecture: Qwen for agents, GPT-5.2 for Director
-      AGENT_LLM_URL: https://5e963ab1e6f1.ngrok-free.app/v1
-      LLM_BASE: https://5e963ab1e6f1.ngrok-free.app
-      DIRECTOR_MODEL: gpt-5.2
+      AGENT_API_KEY: ${AGENT_API_KEY}
+
+      # Optional: Director (cloud)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DIRECTOR_MODEL: ${DIRECTOR_MODEL:-gpt-5.2}
     ports:
       - "7865:7864"
       - "8002:8010"
@@ -55,6 +94,8 @@ services:
           - agent-system
     depends_on:
       postgres:
+        condition: service_healthy
+      llm:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -93,4 +134,3 @@ networks:
   agent-network:
   root_agent-network:
     external: true
-

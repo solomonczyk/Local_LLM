@@ -2,6 +2,8 @@
 Локальный OpenAI-совместимый сервер с обученной LoRA моделью
 Запускает на http://localhost:8010
 """
+import argparse
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
@@ -16,6 +18,7 @@ if torch.cuda.is_available():
 # Пути
 BASE_MODEL = "Qwen/Qwen2.5-Coder-1.5B"
 LORA_PATH = "lora_qwen2_5_coder_1_5b_python"
+ADAPTER_PATH = os.getenv("LORA_ADAPTER_PATH", LORA_PATH)
 
 app = FastAPI()
 
@@ -51,7 +54,7 @@ else:
     )
 
 print("Загрузка LoRA адаптера...")
-model = PeftModel.from_pretrained(model, LORA_PATH)
+model = PeftModel.from_pretrained(model, ADAPTER_PATH)
 model.eval()
 print("✅ Модель готова!")
 
@@ -131,7 +134,13 @@ async def list_models():
 @app.get("/health")
 async def health_check():
     """Health check endpoint для проверки доступности сервера"""
-    return {"status": "healthy", "model_loaded": model is not None, "model_name": "qwen2.5-coder-lora"}
+    return {
+        "status": "healthy",
+        "model_loaded": model is not None,
+        "model_name": "qwen2.5-coder-lora",
+        "backend": "peft",
+        "lora": ADAPTER_PATH,
+    }
 
 @app.get("/v1/health")
 async def health_check_v1():
@@ -139,7 +148,11 @@ async def health_check_v1():
     return await health_check()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="LoRA inference server")
+    parser.add_argument("--port", type=int, default=8010)
+    args = parser.parse_args()
+    print(f"[LLM] backend=peft lora_adapter={ADAPTER_PATH}")
     print("\n🚀 Сервер запущен на http://localhost:8010")
     print("📝 OpenAI API endpoint: http://localhost:8010/v1")
-    uvicorn.run(app, host="0.0.0.0", port=8010)
+    uvicorn.run(app, host="0.0.0.0", port=args.port)
 

@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libpq-dev \
     curl \
+    git \
+    ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 # Создаем пользователя для безопасности

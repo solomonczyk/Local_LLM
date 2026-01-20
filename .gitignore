@@ -37,6 +37,8 @@ codesearchnet_python_*/
 *.bin
 lora_*/
 checkpoint-*/
+models/
+*.gguf
 
 # TensorBoard
 runs/
@@ -71,4 +73,7 @@ body.json
 ssl/*.key
 ssl/*.crt
 ssl/*.pem
+
+# Local reports (generated)
+reports/*.json
 
