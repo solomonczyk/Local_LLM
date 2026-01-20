@@ -66,6 +66,23 @@ jobs:
       - name: Run eval taxonomy
         run: python tools/eval_taxonomy.py
 
+      - name: Constitution check (soft)
+        run: |
+          if [ -f docs/senior_engineer_constitution_for_llm_user_specific_detailed.md ]; then
+            if command -v rg >/dev/null 2>&1; then
+              CHECK_CMD="rg -n"
+            else
+              CHECK_CMD="grep -nE"
+            fi
+            if $CHECK_CMD "<<<<<<<|=======|>>>>>>>" docs/senior_engineer_constitution_for_llm_user_specific_detailed.md > /dev/null; then
+              echo "CONSTITUTION: CONFLICT_MARKERS" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "CONSTITUTION: OK" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "CONSTITUTION: MISSING" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Generate decision dashboard
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
 
