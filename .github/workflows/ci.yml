@@ -141,6 +141,25 @@ jobs:
             fi
           fi
 
+      - name: Generate intelligence manifest
+        run: |
+          python tools/generate_intelligence_manifest.py
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            if [ -f data/reports/intelligence_manifest.json ]; then
+              FIELDS=$(python -c "import json; d=json.load(open('data/reports/intelligence_manifest.json')); print(f\"backend={d.get('llm_backend','unknown')} lora={d.get('lora_adapter_path','unknown')}\")")
+              echo "INTELLIGENCE: ${FIELDS}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "INTELLIGENCE: unknown" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Latency smoke (observability)
+        run: |
+          python tools/latency_smoke.py | tee data/reports/latency_smoke.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            tail -n 1 data/reports/latency_smoke.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload decision trend baseline
         uses: actions/upload-artifact@v4
         with:
@@ -156,6 +175,7 @@ jobs:
             data/reports/dashboard_daily.md
             data/reports/decision_trend.txt
             data/reports/remediation_plan.json
+            data/reports/intelligence_manifest.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
           if-no-files-found: ignore
