@@ -534,6 +534,7 @@ def main() -> None:
                 adaptive_line = summaries[0].get("adaptive_threshold_line", "ADAPTIVE_THRESHOLD: none")
                 adaptive_status_line = summaries[0].get("adaptive_status_line", "ADAPTIVE_STATUS: none")
                 trend_line = f"TREND: {summaries[0].get('trend_status')}"
+                action_priority_line = summaries[0].get("rca_action_priority_line")
                 simulation_line = (
                     f"ROLLBACK_SIMULATION: {simulation_status}"
                     if simulation_status != "none"
@@ -557,6 +558,11 @@ def main() -> None:
                     summary_file.write(rollback_approval_line + "\n")
                     summary_file.write(pressure_line + "\n")
                     summary_file.write(feedback_line + "\n")
+                    if action_priority_line:
+                        summary_file.write(action_priority_line + "\n")
+                        action_path = Path("data/reports/rca_action_priority.txt")
+                        action_path.parent.mkdir(parents=True, exist_ok=True)
+                        action_path.write_text(action_priority_line + "\n", encoding="utf-8")
                     summary_file.write(rollback_status + "\n")
             if approval_exit_code is not None:
                 sys.exit(approval_exit_code)
@@ -1189,6 +1195,8 @@ def main() -> None:
             maybe_exit(0)
             return
         bad_by_class = {}
+        bad_by_why_now = {}
+        bad_by_what_to_fix = {}
         bad_reason_tokens = {}
         penalty_sample = None
         penalty_counts = {key: 0 for key in PENALTY_KEYWORDS}
@@ -1219,6 +1227,18 @@ def main() -> None:
                     bad_by_class[decision_class] = bad_by_class.get(decision_class, 0) + 1
                     penalty_reason = event.get("penalty_reason") or "other"
                     penalty_counts[penalty_reason] = penalty_counts.get(penalty_reason, 0) + 1
+                    why_now = event.get("why_now")
+                    if isinstance(why_now, str) and why_now.strip() and why_now != "unknown":
+                        key = why_now.strip()
+                        bad_by_why_now[key] = bad_by_why_now.get(key, 0) + 1
+                    what_to_fix = event.get("what_to_fix")
+                    if (
+                        isinstance(what_to_fix, str)
+                        and what_to_fix.strip()
+                        and what_to_fix != "unknown"
+                    ):
+                        key = what_to_fix.strip()
+                        bad_by_what_to_fix[key] = bad_by_what_to_fix.get(key, 0) + 1
                     if penalty_sample is None:
                         penalty_sample = (
                             f"PENALTY_SAMPLE: event_id={event.get('event_id')} "
@@ -1329,6 +1349,28 @@ def main() -> None:
                 f"{key}={rca_bad_penalty_director_process.get(key, 0)}" for key in penalty_keys
             )
         )
+        rca_bad_why_now_line = "RCA_BAD_WHY_NOW: " + " ".join(
+            f"{key}={bad_by_why_now[key]}"
+            for key in sorted(bad_by_why_now.keys())
+        ) if bad_by_why_now else "RCA_BAD_WHY_NOW: none"
+        rca_bad_what_to_fix_line = "RCA_BAD_WHAT_TO_FIX: " + " ".join(
+            f"{key}={bad_by_what_to_fix[key]}"
+            for key in sorted(bad_by_what_to_fix.keys())
+        ) if bad_by_what_to_fix else "RCA_BAD_WHAT_TO_FIX: none"
+        priority_entries = []
+        if bad > 0 and bad_by_what_to_fix:
+            for key, count in bad_by_what_to_fix.items():
+                if key == "unknown":
+                    continue
+                impact = count / bad
+                priority_entries.append((impact, key))
+            priority_entries.sort(key=lambda item: (-item[0], item[1]))
+        if priority_entries:
+            rca_action_priority_line = "RCA_ACTION_PRIORITY: " + " ".join(
+                f"{key}={impact:.2f}" for impact, key in priority_entries[:3]
+            )
+        else:
+            rca_action_priority_line = "RCA_ACTION_PRIORITY: none"
         rca_mitigated_count_line = (
             "RCA_MITIGATED_COUNT_DIRECTOR_PROCESS: "
             f"regressions_mitigated={mitigated_counts_director_process['regressions_mitigated']} "
@@ -1374,6 +1416,9 @@ def main() -> None:
             print(rca_bad_by_agent_line)
             print(rca_bad_by_class_director_line)
             print(rca_bad_penalty_director_process_line)
+            print(rca_bad_why_now_line)
+            print(rca_bad_what_to_fix_line)
+            print(rca_action_priority_line)
             print(regressions_conf_line)
             print(policy_applied_line)
             print(policy_applied_all_line)
@@ -1440,11 +1485,15 @@ def main() -> None:
                         "bad_total": bad,
                         "bad_agent_field_present": bad_agent_field_present,
                     },
-                    "rca_bad_by_agent": rca_bad_by_agent,
-                    "rca_bad_by_class_director": rca_bad_by_class_director,
-                    "rca_bad_penalty_director_process": rca_bad_penalty_director_process,
-                    "retrofill_applied": retrofill_applied,
-                }
+                "rca_bad_by_agent": rca_bad_by_agent,
+                "rca_bad_by_class_director": rca_bad_by_class_director,
+                "rca_bad_penalty_director_process": rca_bad_penalty_director_process,
+                "rca_action_priority_line": (
+                    None if rca_action_priority_line == "RCA_ACTION_PRIORITY: none"
+                    else rca_action_priority_line
+                ),
+                "retrofill_applied": retrofill_applied,
+            }
                 print(f"SUMMARY_JSON: {json.dumps(summary, ensure_ascii=False)}")
             maybe_exit(2)
             return
@@ -1469,6 +1518,9 @@ def main() -> None:
             print(rca_bad_by_agent_line)
             print(rca_bad_by_class_director_line)
             print(rca_bad_penalty_director_process_line)
+            print(rca_bad_why_now_line)
+            print(rca_bad_what_to_fix_line)
+            print(rca_action_priority_line)
             print(regressions_conf_line)
             print(policy_applied_line)
             print(policy_applied_all_line)
@@ -1538,6 +1590,10 @@ def main() -> None:
                 "rca_bad_by_agent": rca_bad_by_agent,
                 "rca_bad_by_class_director": rca_bad_by_class_director,
                 "rca_bad_penalty_director_process": rca_bad_penalty_director_process,
+                "rca_action_priority_line": (
+                    None if rca_action_priority_line == "RCA_ACTION_PRIORITY: none"
+                    else rca_action_priority_line
+                ),
                 "retrofill_applied": retrofill_applied,
             }
             print(f"SUMMARY_JSON: {json.dumps(summary, ensure_ascii=False)}")
