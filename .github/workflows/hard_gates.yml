@@ -9,19 +9,23 @@ on:
 jobs:
   hard-gates:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
-      - name: Generate reports (if pipeline exists)
+      - name: Generate reports
         run: |
           mkdir -p data/reports
           if [ -f tools/decision_dashboard.py ]; then
@@ -34,23 +38,19 @@ jobs:
       - name: Enforce hard gates
         run: |
           set -e
-          verdict_file="data/reports/consilium_verdict.json"
-          dashboard_file="data/reports/dashboard_daily.md"
+          VERDICT_FILE="data/reports/consilium_verdict.json"
+          DASHBOARD_FILE="data/reports/dashboard_daily.md"
 
           verdict="unknown"
-          if [ -f "$verdict_file" ]; then
+          if [ -f "$VERDICT_FILE" ]; then
             verdict=$(python - <<'PY'
 import json
-p="data/reports/consilium_verdict.json"
-d=json.load(open(p,"r",encoding="utf-8"))
+d=json.load(open("data/reports/consilium_verdict.json","r",encoding="utf-8"))
 r=d.get("director_result", d)
-# director_result может быть строкой/словарём/вложенным словарём
 if isinstance(r,str):
     print(r)
 elif isinstance(r,dict):
-    # пробуем типовые поля
     v = r.get("decision") or r.get("recommended_action") or r.get("action")
-    # иногда решение может лежать глубже
     if not v and isinstance(r.get("result"), dict):
         rr = r["result"]
         v = rr.get("decision") or rr.get("recommended_action") or rr.get("action")
@@ -58,18 +58,19 @@ elif isinstance(r,dict):
 else:
     print("unknown")
 PY
-            )
+)
           fi
 
           echo "HARD_GATES: verdict=$verdict"
 
-          # Fail on HOLD (hard escalation)
-          echo "$verdict" | grep -qi "hold" && { echo "HARD_GATES_FAIL: director verdict contains HOLD"; exit 1; } || true
+          echo "$verdict" | grep -qi "hold" && {
+            echo "HARD_GATES_FAIL: director verdict contains HOLD"
+            exit 1
+          } || true
 
-          # Fail on TEMPORAL_GATE SOFT signals found in dashboard
-          if [ -f "$dashboard_file" ]; then
-            if grep -qi "TEMPORAL_GATE: SOFT" "$dashboard_file"; then
-              echo "HARD_GATES_FAIL: TEMPORAL_GATE is SOFT in dashboard"
+          if [ -f "$DASHBOARD_FILE" ]; then
+            if grep -qi "TEMPORAL_GATE: SOFT" "$DASHBOARD_FILE"; then
+              echo "HARD_GATES_FAIL: TEMPORAL_GATE is SOFT"
               exit 1
             fi
           fi
