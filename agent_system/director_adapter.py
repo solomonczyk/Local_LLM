@@ -289,6 +289,12 @@ Focus on:
             {"role": "user", "content": sanitized_prompt},
         ]
         messages[-1]["content"] = messages[-1]["content"][:12000]
+        max_completion_tokens = 600
+        if (
+            os.getenv("LATENCY_MODE") == "CONSERVATIVE"
+            and request.risk_level == RiskLevel.LOW
+        ):
+            max_completion_tokens = max_completion_tokens // 2
 
         try:
             t0 = time.perf_counter()
@@ -296,7 +302,7 @@ Focus on:
                 model=self.model,
                 messages=messages,
                 temperature=0,
-                max_completion_tokens=600,
+                max_completion_tokens=max_completion_tokens,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
