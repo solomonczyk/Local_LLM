@@ -368,10 +368,13 @@ Focus on:
             has_mitigation = any(kw in mit_text for kw in mitigation_keywords)
             if has_mitigation:
                 confidence = min(1.0, (confidence or 0.0) + 0.05)
-            score = confidence * risk_multiplier
             override_signal_weight = 0.0
             if request.override_context and request.override_context.get("override_kind") == "noise":
                 override_signal_weight = 0.0
+            uncertainty = "high" if (request.override_context and request.override_context.get("present")) else "unknown"
+            if uncertainty == "high":
+                confidence = max(0.0, confidence - 0.15)
+            score = confidence * risk_multiplier
             append_decision_event({
                 "type": "director_decision",
                 "agent": "director",
@@ -384,6 +387,7 @@ Focus on:
                 "next_step": next_step,
                 "override_context": request.override_context,
                 "override_signal_weight": override_signal_weight,
+                "uncertainty": uncertainty,
             })
             return DirectorResponse(
                 decision=result['decision'],
