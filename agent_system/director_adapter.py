@@ -34,6 +34,7 @@ class DirectorRequest:
     agent_summaries: Dict[str, str]
     risk_level: RiskLevel
     confidence: float
+    override_context: Optional[Dict[str, Any]] = None
     
     def validate(self) -> bool:
         """Валидация контракта"""
@@ -368,6 +369,9 @@ Focus on:
             if has_mitigation:
                 confidence = min(1.0, (confidence or 0.0) + 0.05)
             score = confidence * risk_multiplier
+            override_signal_weight = 0.0
+            if request.override_context and request.override_context.get("override_kind") == "noise":
+                override_signal_weight = 0.0
             append_decision_event({
                 "type": "director_decision",
                 "agent": "director",
@@ -378,6 +382,8 @@ Focus on:
                 "decision_class": result["decision_class"],
                 "risks": result["risks"],
                 "next_step": next_step,
+                "override_context": request.override_context,
+                "override_signal_weight": override_signal_weight,
             })
             return DirectorResponse(
                 decision=result['decision'],

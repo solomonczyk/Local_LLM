@@ -75,12 +75,24 @@ class ShadowDirector:
             # === DECISION CAPSULE: Факты (≤8 bullets) ===
             facts = self._create_compact_facts(routing, opinions, result)
             
+            # === OVERRIDE CONTEXT: Обогащение сигнала ===
+            override_context = {
+                "present": True,
+                "source": "human",
+                "reason": "temporal_hard_gate_bypassed",
+                "temporal_state": "HARD",
+                "escalation_window_hours": 72,
+                "override_decision": "allow",
+                "override_kind": "noise"
+            }
+            
             return DirectorRequest(
                 problem_summary=problem_summary,
                 facts=facts[:8],  # Жёсткий лимит: 8 фактов
                 agent_summaries=agent_summaries,
                 risk_level=risk_level,
-                confidence=confidence
+                confidence=confidence,
+                override_context=override_context
             )
             
         except Exception as e:
