@@ -48,19 +48,19 @@ jobs:
           VERDICT_FILE="data/reports/consilium_verdict.json"
           DASHBOARD_FILE="data/reports/dashboard_daily.md"
 
-          # --- Human override via PR Approve (16B, no heredoc) ---
-          APPROVALS=0
-          if [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_EVENT_PATH:-}" ]; then
-            PR_NUMBER=$(python -c "import json; d=json.load(open('$GITHUB_EVENT_PATH','r',encoding='utf-8')); print(d.get('pull_request',{}).get('number',''))")
-            if [ -n "$PR_NUMBER" ]; then
-              APPROVALS=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json reviews --jq '[.reviews[] | select(.state=="APPROVED")] | length')
-            fi
-          fi
-          echo "HUMAN_OVERRIDE: approvals=$APPROVALS"
+          # --- Human override via PR label (solo-friendly) ---
           OVERRIDE_ALLOWED=0
-          if [ "${APPROVALS:-0}" -ge 1 ]; then
+          LABEL_OVERRIDE=0
+          
+          PR_NUMBER=$(python -c "import json; d=json.load(open('$GITHUB_EVENT_PATH','r',encoding='utf-8')); print(d.get('pull_request',{}).get('number',''))")
+          if [ -n "$PR_NUMBER" ]; then
+            LABEL_OVERRIDE=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | index(\"override-approved\") != null')
+          fi
+          
+          echo "HUMAN_OVERRIDE: label_override=$LABEL_OVERRIDE"
+          if [ "$LABEL_OVERRIDE" = "true" ]; then
             OVERRIDE_ALLOWED=1
-            echo "HUMAN_OVERRIDE: ALLOWED (>=1 APPROVE)"
+            echo "HUMAN_OVERRIDE: ALLOWED (label override-approved)"
           fi
           # --- end override ---
 
