@@ -44,19 +44,19 @@ jobs:
       - name: Enforce hard gates
         run: |
           set -e
-        
+
           VERDICT_FILE="data/reports/consilium_verdict.json"
           DASHBOARD_FILE="data/reports/dashboard_daily.md"
-        
+
           verdict="unknown"
-        
+
           if [ -f "$VERDICT_FILE" ]; then
             verdict=$(python - <<'PY'
-import json
-d=json.load(open("data/reports/consilium_verdict.json"))
-print(d.get("decision","unknown"))
-PY
-)
+          import json
+          d=json.load(open("data/reports/consilium_verdict.json"))
+          print(d.get("decision","unknown"))
+          PY
+            )
           fi
-        
+
           echo "HARD_GATES_VERDICT=$verdict"
