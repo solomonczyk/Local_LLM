@@ -53,8 +53,7 @@ jobs:
           if [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_EVENT_PATH:-}" ]; then
             PR_NUMBER=$(python -c "import json; d=json.load(open('$GITHUB_EVENT_PATH','r',encoding='utf-8')); print(d.get('pull_request',{}).get('number',''))")
             if [ -n "$PR_NUMBER" ]; then
-              APPROVALS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" \
-                --jq '[.[] | select(.state=="APPROVED")] | length')
+              APPROVALS=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json reviews --jq '[.reviews[] | select(.state=="APPROVED")] | length')
             fi
           fi
           echo "HUMAN_OVERRIDE: approvals=$APPROVALS"
