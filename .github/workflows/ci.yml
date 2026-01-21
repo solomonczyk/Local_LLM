@@ -100,6 +100,17 @@ jobs:
             cat promote_gate.txt >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Report human override (if any)
+        run: |
+          if [ -f human_override.json ]; then
+            DECISION=$(python -c "import json; d=json.load(open('human_override.json')); print(d.get('decision',''))")
+            SCOPE=$(python -c "import json; d=json.load(open('human_override.json')); print(d.get('scope',''))")
+            ENABLED=$(python -c "import json; d=json.load(open('human_override.json')); print(d.get('enabled',False))")
+            echo "HUMAN_OVERRIDE: enabled=${ENABLED} decision=${DECISION} scope=${SCOPE}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "HUMAN_OVERRIDE: none" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Seed decision events for TREND (CI-only)
         run: |
           python - << 'PY'
@@ -276,6 +287,7 @@ jobs:
             data/reports/training_pack.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
+            human_override.json
             promote_gate.txt
             temporal.txt
           if-no-files-found: ignore

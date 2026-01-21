@@ -40,6 +40,7 @@ jobs:
           if [ -f tools/temporal_escalation.py ]; then
             python tools/temporal_escalation.py > data/reports/temporal_escalation.txt
           fi
+          if [ -f tools/override_guardrails_check.py ]; then python tools/override_guardrails_check.py | tee data/reports/override_guardrails.txt; fi
 
       - name: Enforce hard gates
         run: |
