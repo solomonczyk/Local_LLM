@@ -1,0 +1,99 @@
+name: Hard Gates
+
+on:
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  hard-gates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Generate reports
+        run: |
+          mkdir -p data/reports
+          if [ -f tools/decision_dashboard.py ]; then
+            python tools/decision_dashboard.py --out data/reports/dashboard_daily.md || true
+          fi
+          if [ -f tools/consilium_to_director.py ]; then
+            python tools/consilium_to_director.py || true
+          fi
+          if [ -f tools/temporal_escalation.py ]; then
+            python tools/temporal_escalation.py > data/reports/temporal_escalation.txt
+          fi
+          if [ -f tools/override_guardrails_check.py ]; then python tools/override_guardrails_check.py | tee data/reports/override_guardrails.txt; fi
+
+      - name: Enforce hard gates
+        run: |
+          set -e
+
+          VERDICT_FILE="data/reports/consilium_verdict.json"
+          DASHBOARD_FILE="data/reports/dashboard_daily.md"
+
+          # --- Human override via PR label (solo-friendly) ---
+          OVERRIDE_ALLOWED=0
+          LABEL_OVERRIDE=0
+          
+          PR_NUMBER=$(python -c "import json; d=json.load(open('$GITHUB_EVENT_PATH','r',encoding='utf-8')); print(d.get('pull_request',{}).get('number',''))")
+          if [ -n "$PR_NUMBER" ]; then
+            LABEL_OVERRIDE=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels | jq -r '[.labels[].name] | index("override-approved") != null')
+          fi
+          
+          echo "HUMAN_OVERRIDE: label_override=$LABEL_OVERRIDE"
+          if [ "$LABEL_OVERRIDE" = "true" ]; then
+            OVERRIDE_ALLOWED=1
+            echo "HUMAN_OVERRIDE: ALLOWED (label override-approved)"
+          fi
+          # --- end override ---
+
+          verdict="unknown"
+
+          if [ -f "$VERDICT_FILE" ]; then
+            verdict=$(python - <<'PY'
+          import json
+          d=json.load(open("data/reports/consilium_verdict.json"))
+          print(d.get("decision","unknown"))
+          PY
+            )
+          fi
+
+          echo "HARD_GATES_VERDICT=$verdict"
+
+          echo "$verdict" | grep -qi "hold" && {
+            if [ "$OVERRIDE_ALLOWED" = "1" ]; then
+              echo "HARD_GATES_OVERRIDE: HOLD bypassed by human approval"
+            else
+              echo "HARD_GATES_FAIL: director verdict contains HOLD"
+              exit 1
+            fi
+          } || true
+
+          if [ -f "$DASHBOARD_FILE" ]; then
+            if grep -qi "TEMPORAL_GATE: SOFT" "$DASHBOARD_FILE"; then
+              echo "HARD_GATES_FAIL: TEMPORAL_GATE is SOFT"
+              exit 1
+            fi
+          fi
+
+          echo "HARD_GATES_PASS"
