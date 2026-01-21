@@ -9,6 +9,9 @@ on:
 jobs:
   hard-gates:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout
@@ -44,6 +47,40 @@ jobs:
           VERDICT_FILE="data/reports/consilium_verdict.json"
           DASHBOARD_FILE="data/reports/dashboard_daily.md"
 
+          # --- Human override via PR Approve (16B) ---
+          APPROVALS=0
+          if [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_EVENT_PATH:-}" ]; then
+            PR_NUMBER=$(python -c "import json; d=json.load(open('$GITHUB_EVENT_PATH','r',encoding='utf-8')); print(d.get('pull_request',{}).get('number',''))")
+            REPO=$(python -c "import json; d=json.load(open('$GITHUB_EVENT_PATH','r',encoding='utf-8')); r=d.get('repository',{}); print(f\"{r.get('owner',{}).get('login','')}/{r.get('name','')}\")")
+            if [ -n "$PR_NUMBER" ] && [ -n "$REPO" ]; then
+              APPROVALS=$(python - <<'PY'
+import json, os, urllib.request
+token=os.environ.get("GITHUB_TOKEN","")
+repo=os.environ.get("REPO","")
+pr=os.environ.get("PR_NUMBER","")
+url=f"https://api.github.com/repos/{repo}/pulls/{pr}/reviews?per_page=100"
+req=urllib.request.Request(url, headers={
+  "Authorization": f"Bearer {token}",
+  "Accept": "application/vnd.github+json",
+  "User-Agent": "hard-gates"
+})
+with urllib.request.urlopen(req, timeout=20) as resp:
+  data=json.loads(resp.read().decode("utf-8"))
+# count APPROVED reviews (simple rule)
+approved=sum(1 for r in data if r.get("state")=="APPROVED")
+print(approved)
+PY
+              )
+            fi
+          fi
+          echo "HUMAN_OVERRIDE: approvals=$APPROVALS"
+          OVERRIDE_ALLOWED=0
+          if [ "${APPROVALS:-0}" -ge 1 ]; then
+            OVERRIDE_ALLOWED=1
+            echo "HUMAN_OVERRIDE: ALLOWED (>=1 APPROVE)"
+          fi
+          # --- end override ---
+
           verdict="unknown"
           if [ -f "$VERDICT_FILE" ]; then
             verdict=$(python <<'PY'
@@ -63,8 +100,12 @@ PY
           echo "HARD_GATES: verdict=$verdict"
 
           echo \"$verdict\" | grep -qi \"hold\" && {
-            echo \"HARD_GATES_FAIL: director verdict contains HOLD\"
-            exit 1
+            if [ \"$OVERRIDE_ALLOWED\" = \"1\" ]; then
+              echo \"HARD_GATES_OVERRIDE: HOLD bypassed by human approval\"
+            else
+              echo \"HARD_GATES_FAIL: director verdict contains HOLD\"
+              exit 1
+            fi
           } || true
 
           if [ -f \"$DASHBOARD_FILE\" ]; then
