@@ -1,0 +1,9 @@
+AUTO-GUARD: PASS
+TREND: FAIL
+ADAPTIVE_THRESHOLD: base=0.6 effective=0.65 high_risk_share=0.50
+ROLLBACK_STATUS: suggested=false allowed=true readiness=PASS simulation=none approval=OK
+ROLLBACK_READINESS: PASS
+ROLLBACK_SIMULATION: none
+ROLLBACK_APPROVAL: OK
+ROLLBACK_PRESSURE: OK (simulated=1)
+ROLLBACK_FEEDBACK: none

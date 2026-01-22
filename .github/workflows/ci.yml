@@ -55,8 +55,61 @@ jobs:
           DIRECTOR_ACTIVE_MODE: "false"
           SHADOW_DIRECTOR_ENABLED: "false"
 
+      - name: Run minimal eval (observability)
+        run: |
+          mkdir -p data/reports
+          python tools/run_minimal_eval.py | tee data/reports/minimal_eval.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            tail -n 2 data/reports/minimal_eval.txt | sed 's/^/MIN_EVAL: /' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run eval taxonomy
+        run: python tools/eval_taxonomy.py
+
+      - name: Constitution check (soft)
+        run: |
+          if [ -f docs/senior_engineer_constitution_for_llm_user_specific_detailed.md ]; then
+            if command -v rg >/dev/null 2>&1; then
+              CHECK_CMD="rg -n"
+            else
+              CHECK_CMD="grep -nE"
+            fi
+            if $CHECK_CMD "<<<<<<<|=======|>>>>>>>" docs/senior_engineer_constitution_for_llm_user_specific_detailed.md > /dev/null; then
+              echo "CONSTITUTION: CONFLICT_MARKERS" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "CONSTITUTION: OK" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "CONSTITUTION: MISSING" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Generate decision dashboard
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
+
+      - name: Temporal aggregation
+        run: |
+          python tools/temporal_aggregation.py | tee temporal.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat temporal.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Policy guard (SOFT)
+        run: |
+          python tools/policy_guard.py | tee promote_gate.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat promote_gate.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Report human override (if any)
+        run: |
+          if [ -f human_override.json ]; then
+            DECISION=$(python -c "import json; d=json.load(open('human_override.json')); print(d.get('decision',''))")
+            SCOPE=$(python -c "import json; d=json.load(open('human_override.json')); print(d.get('scope',''))")
+            ENABLED=$(python -c "import json; d=json.load(open('human_override.json')); print(d.get('enabled',False))")
+            echo "HUMAN_OVERRIDE: enabled=${ENABLED} decision=${DECISION} scope=${SCOPE}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "HUMAN_OVERRIDE: none" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Seed decision events for TREND (CI-only)
         run: |
@@ -92,6 +145,10 @@ jobs:
               "decision": f"CI seed decision #{len(existing)+i+1}",
               "confidence": 0.85,
               "score": 0.85,
+              "prompt_tokens": 500,
+              "completion_tokens": 200,
+              "total_tokens": 700,
+              "latency_ms": 2500,
               "risk_level": "LOW",
               "decision_class": "process",
               "risks": [],
@@ -118,6 +175,95 @@ jobs:
             exit 0
           fi
 
+      - name: Generate remediation plan
+        run: |
+          if [ -f data/reports/rca_action_priority.txt ]; then
+            export RCA_ACTION_PRIORITY=$(sed 's/^RCA_ACTION_PRIORITY: //' data/reports/rca_action_priority.txt)
+          fi
+          python tools/generate_remediation_plan.py
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            if [ -f data/reports/remediation_plan.json ]; then
+              N=$(python -c "import json; print(len(json.load(open('data/reports/remediation_plan.json'))['items']))")
+              echo "REMEDIATION_PLAN: items=$N" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "REMEDIATION_PLAN: items=0" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Generate intelligence manifest
+        run: |
+          python tools/generate_intelligence_manifest.py
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            if [ -f data/reports/intelligence_manifest.json ]; then
+              FIELDS=$(python -c "import json; d=json.load(open('data/reports/intelligence_manifest.json')); print(f\"backend={d.get('llm_backend','unknown')} lora={d.get('lora_adapter_path','unknown')}\")")
+              echo "INTELLIGENCE: ${FIELDS}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "INTELLIGENCE: unknown" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Append intelligence timeline
+        run: |
+          python tools/append_intelligence_timeline.py
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            if [ -f data/reports/intelligence_timeline.jsonl ]; then
+              N=$(wc -l < data/reports/intelligence_timeline.jsonl | tr -d ' ')
+              echo "INTEL_TIMELINE: lines=$N" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "INTEL_TIMELINE: lines=0" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Director autolink smoke (CI)
+        run: |
+          python - <<'PY'
+          import time
+          from agent_system.decision_log import append_decision_event
+          try:
+              from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
+              d = DirectorAdapter()
+              req = DirectorRequest(
+                  problem_summary="CI autolink smoke test",
+                  facts=["ci"],
+                  agent_summaries={"dev": "ok"},
+                  risk_level=RiskLevel.LOW,
+                  confidence=0.5,
+              )
+              res = d.call_director(req)
+              print("AUTOLINK_SMOKE: director_call_ok")
+          except Exception as exc:
+              append_decision_event({
+                  "type": "director_decision",
+                  "agent": "director",
+                  "decision": "CI autolink smoke (record-only)",
+                  "next_step": "none",
+                  "confidence": 0.5,
+                  "prompt_tokens": 500,
+                  "completion_tokens": 200,
+                  "total_tokens": 700,
+                  "latency_ms": 2500,
+                  "synthetic": True,
+                  "risk_level": "low",
+                  "decision_class": "process",
+                  "risks": [],
+              })
+              print(f"AUTOLINK_SMOKE: fallback_record_only ({exc})")
+          PY
+
+      - name: Latency smoke (observability)
+        run: |
+          python tools/latency_smoke.py | tee data/reports/latency_smoke.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            tail -n 1 data/reports/latency_smoke.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Cost smoke (observability)
+        run: |
+          python tools/cost_smoke.py | tee data/reports/cost_smoke.txt
+          if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            cat data/reports/cost_smoke.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload decision trend baseline
         uses: actions/upload-artifact@v4
         with:
@@ -132,8 +278,18 @@ jobs:
           path: |
             data/reports/dashboard_daily.md
             data/reports/decision_trend.txt
+            data/reports/remediation_plan.json
+            data/reports/eval_fails_taxonomy.jsonl
+            data/reports/intelligence_manifest.json
+            data/reports/intelligence_timeline.jsonl
+            data/reports/intelligence_report.md
+            data/reports/prompt_patch_plan.json
+            data/reports/training_pack.json
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
+            human_override.json
+            promote_gate.txt
+            temporal.txt
           if-no-files-found: ignore
 
   security-check:

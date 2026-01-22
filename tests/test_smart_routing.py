@@ -72,16 +72,64 @@ class TestSmartRouting(unittest.TestCase):
     def test_route_agents_security_only(self) -> None:
         """Test routing with security triggers only"""
         result = route_agents("Check JWT token vulnerability")
-        
+
         self.assertIn(result["mode"], ["STANDARD", "CRITICAL"])
         self.assertIn("security", result["agents"])
         self.assertIn("dev", result["agents"])
         self.assertIn("security", result["triggers_matched"])
 
+    def test_route_agents_russian_security(self) -> None:
+        """Test routing with Russian security triggers"""
+        result = route_agents("Проверь уязвимость и безопасность токена")
+
+        self.assertIn(result["mode"], ["STANDARD", "CRITICAL"])
+        self.assertIn("security", result["agents"])
+        self.assertIn("security", result["triggers_matched"])
+
+    def test_route_agents_russian_critical(self) -> None:
+        """Test routing with Russian critical triggers"""
+        result = route_agents("Критический инцидент безопасности, нужно срочно")
+
+        self.assertEqual(result["mode"], "CRITICAL")
+        self.assertIn("director", result["agents"])
+        self.assertIn("critical", result["triggers_matched"])
+
+    def test_route_agents_russian_architect(self) -> None:
+        """Test routing with Russian architecture triggers"""
+        result = route_agents("Нужна архитектура и масштабирование системы")
+
+        self.assertIn(result["mode"], ["STANDARD", "CRITICAL"])
+        self.assertIn("architect", result["agents"])
+        self.assertIn("architect", result["triggers_matched"])
+
+    def test_route_agents_russian_qa(self) -> None:
+        """Test routing with Russian QA triggers"""
+        result = route_agents("Нужно тестирование и покрытие тестами")
+
+        self.assertIn(result["mode"], ["STANDARD", "CRITICAL"])
+        self.assertIn("qa", result["agents"])
+        self.assertIn("qa", result["triggers_matched"])
+
+    def test_route_agents_russian_ux(self) -> None:
+        """Test routing with Russian UX triggers"""
+        result = route_agents("Улучшить UX интерфейса и дизайн систему")
+
+        self.assertIn(result["mode"], ["STANDARD", "CRITICAL"])
+        self.assertIn("ux", result["agents"])
+        self.assertIn("ux", result["triggers_matched"])
+
+    def test_route_agents_russian_seo(self) -> None:
+        """Test routing with Russian SEO triggers"""
+        result = route_agents("Нужна SEO оптимизация сайта и sitemap")
+
+        self.assertIn(result["mode"], ["STANDARD", "CRITICAL"])
+        self.assertIn("seo", result["agents"])
+        self.assertIn("seo", result["triggers_matched"])
+
     def test_route_agents_multiple_domains(self) -> None:
         """Test routing with multiple domain triggers"""
         result = route_agents("Review database architecture security and test coverage")
-        
+
         self.assertGreaterEqual(result["domains_matched"], 2)
         self.assertIn("architect", result["agents"])
         self.assertIn("security", result["agents"])

@@ -15,7 +15,9 @@ class TestConsiliumAuditCases(unittest.TestCase):
             self.assertIn(case.kind, valid)
 
     def test_has_russian_case(self) -> None:
-        has_cyrillic = any(re.search(r"[А-Яа-я]", case.task or "") for case in CASES)
+        has_cyrillic = any(
+            re.search("[\\u0410-\\u044F\\u0401\\u0451]", case.task or "") for case in CASES
+        )
         self.assertTrue(has_cyrillic)
 
 

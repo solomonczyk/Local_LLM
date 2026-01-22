@@ -1,0 +1,42 @@
+﻿{
+  "prompt_clarity_under_risk": {
+    "type": "prompt",
+    "title": "Improve prompt clarity under HIGH/CRITICAL risk inputs",
+    "actions": [
+      "Add explicit risk-aware instruction block",
+      "Add 2-3 counterexamples for ambiguous cases",
+      "Add a short decision rubric (must/should/must_not)"
+    ],
+    "owner": "director"
+  },
+  "scoring_confidence_noise": {
+    "type": "scoring",
+    "title": "Stabilize confidence scoring to reduce noise",
+    "actions": [
+      "Clamp confidence to discrete buckets (e.g., 0.35/0.55/0.75/0.90)",
+      "Log confidence inputs and derived score components",
+      "Add guardrail for low-sample regimes"
+    ],
+    "owner": "director"
+  },
+  "kb_coverage_gap": {
+    "type": "kb",
+    "title": "Close KB coverage gaps exposed by new request patterns",
+    "actions": [
+      "Extract top failing prompts into KB candidates",
+      "Add 5-10 canonical snippets/examples to KB",
+      "Add retrieval check: ensure KB hit-rate is logged"
+    ],
+    "owner": "kb_manager"
+  },
+  "infra_config_conflict": {
+    "type": "infra",
+    "title": "Resolve config conflicts between LLM_BACKEND and LLM_SERVER_IMPL",
+    "actions": [
+      "When LLM_BACKEND=peft, ignore LLM_SERVER_IMPL (log warning if set)",
+      "Document precedence rules in README",
+      "Add smoke test: backend selection is explicit"
+    ],
+    "owner": "orchestrator"
+  }
+}

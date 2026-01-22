@@ -1,4 +1,3 @@
-@"
 # ===== DENY BY DEFAULT =====
 **
 
@@ -6,27 +5,28 @@
 !Dockerfile
 !requirements.txt
 !docker_entrypoint.py
+!ui.py
+!serve_proxy.py
+!serve_enhanced.py
+!serve_openai.py
+!serve_raw.py
+!rate_limiter.py
 !agent_system/**
 !agent_runtime/**
-!serve_enhanced.py
-!rate_limiter.py
-!ui.py
-!entrypoint.sh
-!scripts/**
-!config/**
-!pyproject.toml
-!setup.py
 
-# ===== GIT =====
-.git
-.gitignore
+# ===== GIT / IDE / OS =====
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
 # ===== PYTHON =====
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
 .pytest_cache/
 .mypy_cache/
 .hypothesis/
@@ -36,12 +36,6 @@ __pycache__/
 .venv/
 venv/
 ENV/
-
-# ===== IDE / OS =====
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
 
 # ===== RUNTIME DATA (NEVER IN IMAGE) =====
 data/
@@ -53,7 +47,7 @@ temp/
 .agent_audit.log
 test_results/
 
-# ===== MODELS / DATASETS =====
+# ===== MODELS / DATASETS (NEVER IN IMAGE) =====
 models/
 model/
 checkpoints/
@@ -67,9 +61,7 @@ lora_*/
 # ===== DOCS / TESTS =====
 docs/
 *.md
+tests/
 test_*.py
 *_test.py
-"@ | Set-Content .\.dockerignore
-
-
 

@@ -3,11 +3,33 @@
 Запуск: python ui.py
 """
 
-import gradio as gr
 import json
 import os
 import sys
 from pathlib import Path
+
+# Gradio 4.x may import `HfFolder` from `huggingface_hub`, but newer hub versions
+# removed it. Provide a minimal compatibility shim to keep UI booting.
+try:
+    import huggingface_hub  # type: ignore
+
+    if not hasattr(huggingface_hub, "HfFolder"):
+        from typing import Optional
+
+        class HfFolder:  # type: ignore
+            @staticmethod
+            def get_token() -> Optional[str]:
+                return None
+
+            @staticmethod
+            def save_token(token: str) -> None:
+                return None
+
+        huggingface_hub.HfFolder = HfFolder  # type: ignore[attr-defined]
+except Exception:
+    pass
+
+import gradio as gr
 
 # Добавляем путь для импорта
 sys.path.insert(0, os.path.dirname(__file__))
@@ -267,7 +289,35 @@ def summarize_pending_action(action):
         return "No pending actions"
     tool_calls = action.get("tool_calls", [])
     tools = ", ".join(call.get("tool", "unknown") for call in tool_calls) or "unknown"
-    return f"Pending confirmation for tools: {tools}"
+    lines = [f"Pending confirmation for tools: {tools}"]
+
+    dry_run_results = action.get("dry_run_results", []) or []
+    if dry_run_results:
+        lines.append("")
+        lines.append("=== Dry Run Preview ===")
+        for item in dry_run_results:
+            tool = item.get("tool", "tool")
+            if not item.get("success", False):
+                error = item.get("error", "unknown error")
+                lines.append(f"- {tool}: error: {error}")
+                continue
+
+            result = item.get("result", {}) or {}
+            summary = result.get("summary")
+            if summary:
+                lines.append(f"- {tool}: {summary}")
+
+            diff = result.get("diff")
+            if diff:
+                snippet = diff if len(diff) <= 2000 else diff[:2000] + "\n...[truncated]..."
+                lines.append(snippet)
+
+            preview = result.get("preview")
+            if preview and not diff:
+                snippet = preview if len(preview) <= 2000 else preview[:2000] + "\n...[truncated]..."
+                lines.append(snippet)
+
+    return "\n".join(lines)
 
 def approve_pending_action():
     global pending_action
@@ -342,7 +392,7 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
             output = gr.Textbox(label="Result", lines=20, interactive=False)
 
             gr.Markdown("### Pending Actions")
-            pending_output = gr.Textbox(label="Pending Actions", lines=2, interactive=False, value="No pending actions")
+            pending_output = gr.Textbox(label="Pending Actions", lines=12, interactive=False, value="No pending actions")
             with gr.Row():
                 approve_btn = gr.Button("Approve Action", variant="primary")
                 clear_pending_btn = gr.Button("Clear Pending", variant="secondary")
@@ -367,27 +417,28 @@ with gr.Blocks(title="Agent System UI", theme=gr.themes.Soft()) as demo:
             clear_btn = gr.Button("Clear Files", size="sm")
 
     # Event handlers
-    status_btn.click(fn=get_system_status, outputs=status_output)
+    status_btn.click(fn=get_system_status, outputs=status_output, api_name=False)
 
-    preview_btn.click(fn=preview_routing, inputs=task_input, outputs=preview_output)
+    preview_btn.click(fn=preview_routing, inputs=task_input, outputs=preview_output, api_name=False)
 
     run_btn.click(
         fn=run_task,
         inputs=[task_input, mode_select, smart_routing, health_check, include_context, tools_enabled],
         outputs=[output, pending_output],
+        api_name=False,
     )
 
-    context_btn.click(fn=update_context, inputs=context_input, outputs=context_status)
+    context_btn.click(fn=update_context, inputs=context_input, outputs=context_status, api_name=False)
 
-    file_upload.change(fn=handle_file_upload, inputs=file_upload, outputs=files_status)
+    file_upload.change(fn=handle_file_upload, inputs=file_upload, outputs=files_status, api_name=False)
 
-    clear_btn.click(fn=clear_files, outputs=files_status)
+    clear_btn.click(fn=clear_files, outputs=files_status, api_name=False)
 
-    approve_btn.click(fn=approve_pending_action, outputs=[output, pending_output])
-    clear_pending_btn.click(fn=clear_pending_action, outputs=[output, pending_output])
+    approve_btn.click(fn=approve_pending_action, outputs=[output, pending_output], api_name=False)
+    clear_pending_btn.click(fn=clear_pending_action, outputs=[output, pending_output], api_name=False)
 
     # Загружаем статус при старте
-    demo.load(fn=get_system_status, outputs=status_output)
+    demo.load(fn=get_system_status, outputs=status_output, api_name=False)
 
 if __name__ == "__main__":
     import argparse
@@ -405,7 +456,7 @@ if __name__ == "__main__":
     print(f"Server will be available at http://{host}:{port}")
 
     try:
-        demo.launch(server_name=host, server_port=port, share=False, show_error=True)
+        demo.launch(server_name=host, server_port=port, share=False, show_error=True, show_api=False)
     except Exception as e:
         print(f"Failed to start UI server: {e}")
         import traceback

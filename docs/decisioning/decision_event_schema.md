@@ -13,5 +13,6 @@ Required fields:
 Optional fields:
 - `confidence` (number)
 - `risks` (array of strings)
+- `score` (number)
 
 Deduplication checks only the last tail_n lines for performance; duplicates older than the tail window may be re-appended.

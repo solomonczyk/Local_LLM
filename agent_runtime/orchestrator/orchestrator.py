@@ -3,6 +3,8 @@ Orchestrator - управление циклом работы агента
 """
 from __future__ import annotations
 
+import os
+
 from typing import Any, Dict, List, Optional
 
 from .agent import Agent
@@ -201,13 +203,15 @@ class Orchestrator:
 
 # Lazy singleton для orchestrator
 _orchestrator_instance: Optional[Orchestrator] = None
-
 def get_orchestrator() -> Orchestrator:
-    """Получить singleton экземпляр оркестратора"""
+    """???????? singleton ????????? ????????????"""
     global _orchestrator_instance
     if _orchestrator_instance is None:
-        _orchestrator_instance = Orchestrator()
+        llm_url = os.getenv("AGENT_LLM_URL", "http://localhost:8010/v1")
+        tool_url = os.getenv("TOOL_SERVER_URL", "http://localhost:8011")
+        _orchestrator_instance = Orchestrator(llm_url=llm_url, tool_url=tool_url)
     return _orchestrator_instance
+
 
 # Для обратной совместимости
 orchestrator = get_orchestrator()

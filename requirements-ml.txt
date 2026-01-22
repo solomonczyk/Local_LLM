@@ -1,0 +1,14 @@
+# Optional ML stack (training / LoRA / HF tooling)
+#
+# Note: install an appropriate Torch build for your machine (CPU/CUDA) first.
+# For example, on Windows with CUDA you may prefer installing torch via the official
+# PyTorch index URL rather than pip default wheels.
+
+torch
+transformers
+accelerate
+peft
+datasets
+trl
+safetensors
+

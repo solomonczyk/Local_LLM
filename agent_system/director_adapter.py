@@ -7,6 +7,7 @@ Director Adapter - интерфейс для OpenAI Director
 import os
 import json
 import time
+import math
 import re
 import sys
 import subprocess
@@ -289,14 +290,71 @@ Focus on:
             {"role": "system", "content": "You are an expert AI Director making architectural decisions."},
             {"role": "user", "content": sanitized_prompt},
         ]
+        max_completion_tokens = 600
+        cost_policy = "OFF"
+        cost_mode = os.getenv("COST_MODE")
+        cost_p95_tokens = (
+            self._get_tokens_p95()
+            if request.risk_level == RiskLevel.LOW
+            else None
+        )
+        if (
+            not cost_mode
+            and os.getenv("COST_AUTOLINK") == "1"
+            and request.risk_level == RiskLevel.LOW
+        ):
+            if cost_p95_tokens is not None and cost_p95_tokens > 2500:
+                cost_mode = "ECONOMY"
+                cost_policy = "ECONOMY_AUTO"
         messages[-1]["content"] = messages[-1]["content"][:12000]
+        latency_policy = "OFF"
+        latency_mode = os.getenv("LATENCY_MODE")
+        latency_p95_ms = (
+            self._get_latency_p95()
+            if request.risk_level == RiskLevel.LOW
+            else None
+        )
+        if (
+            not latency_mode
+            and os.getenv("LATENCY_AUTOLINK") == "1"
+            and request.risk_level == RiskLevel.LOW
+        ):
+            if latency_p95_ms is not None and latency_p95_ms > 6000:
+                latency_mode = "CONSERVATIVE"
+                latency_policy = "CONSERVATIVE_AUTO"
+        if (
+            latency_mode == "CONSERVATIVE"
+            and request.risk_level == RiskLevel.LOW
+        ):
+            max_completion_tokens = max_completion_tokens // 2
+            if latency_policy == "OFF":
+                latency_policy = "CONSERVATIVE"
+            messages.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": (
+                        "You are in LATENCY_CONSERVATIVE mode. Be concise. "
+                        "Output only: (1) decision, (2) next_step. No extra explanation."
+                    ),
+                },
+            )
+        if (
+            cost_mode == "ECONOMY"
+            and request.risk_level == RiskLevel.LOW
+        ):
+            max_completion_tokens = max_completion_tokens // 2
+            messages[-1]["content"] = messages[-1]["content"][:6000]
+            if cost_policy == "OFF":
+                cost_policy = "ECONOMY"
 
         try:
+            t0 = time.perf_counter()
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=0,
-                max_completion_tokens=600,
+                max_completion_tokens=max_completion_tokens,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
@@ -329,6 +387,7 @@ Focus on:
                     }
                 }
             )
+            latency_ms = int((time.perf_counter() - t0) * 1000)
             
             # Обновляем метрики
             usage = response.usage
@@ -381,6 +440,16 @@ Focus on:
                 "decision": decision,
                 "confidence": confidence,
                 "score": score,
+                "latency_ms": latency_ms,
+                "latency_policy": latency_policy,
+                "latency_p95_ms": latency_p95_ms,
+                "cost_policy": cost_policy,
+                "cost_p95_tokens": cost_p95_tokens,
+                "why_now": "unknown",
+                "what_to_fix": "unknown",
+                "prompt_tokens": getattr(usage, "prompt_tokens", 0),
+                "completion_tokens": getattr(usage, "completion_tokens", 0),
+                "total_tokens": getattr(usage, "total_tokens", 0),
                 "risk_level": request.risk_level.value,
                 "decision_class": result["decision_class"],
                 "risks": result["risks"],
@@ -415,6 +484,70 @@ Focus on:
             'avg_tokens_per_call': self.metrics['total_tokens'] / max(1, self.metrics['calls_today'])
         }
     
+    def _get_tokens_p95(self, limit: int = 20) -> Optional[int]:
+        log_path = Path("data/decision_events.log")
+        if not log_path.exists():
+            return None
+        try:
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return None
+        tokens = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") != "director_decision":
+                continue
+            if event.get("synthetic") is True:
+                continue
+            total_tokens = event.get("total_tokens")
+            if not isinstance(total_tokens, (int, float)) or total_tokens <= 0:
+                continue
+            tokens.append(int(total_tokens))
+        if not tokens:
+            return None
+        window = tokens[-limit:]
+        window.sort()
+        idx = max(0, math.ceil(0.95 * len(window)) - 1)
+        return window[idx]
+
+    def _get_latency_p95(self, limit: int = 20) -> Optional[int]:
+        log_path = Path("data/decision_events.log")
+        if not log_path.exists():
+            return None
+        try:
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return None
+        latencies = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") != "director_decision":
+                continue
+            if event.get("synthetic") is True:
+                continue
+            latency = event.get("latency_ms")
+            if not isinstance(latency, (int, float)) or latency <= 0:
+                continue
+            latencies.append(int(latency))
+        if not latencies:
+            return None
+        window = latencies[-limit:]
+        window.sort()
+        idx = max(0, math.ceil(0.95 * len(window)) - 1)
+        return window[idx]
+
     def reset_daily_metrics(self):
         """Сброс дневных метрик"""
         self.metrics['calls_today'] = 0
