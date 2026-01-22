@@ -51,7 +51,25 @@ jobs:
 
       - name: Uncertainty taxonomy smoke (CI)
         run: |
-          python tools/run_inference.py --smoke | grep "UNCERTAINTY_TAXONOMY_LOADED version=1.0"
+          python - <<'PY'
+          import subprocess, sys
+
+          p = subprocess.run(
+              ["python", "tools/run_inference.py", "--smoke"],
+              capture_output=True,
+              text=True
+          )
+
+          out = (p.stdout or "") + (p.stderr or "")
+
+          print(out)
+
+          if "UNCERTAINTY_TAXONOMY_LOADED version=1.0" not in out:
+              print("ERROR: taxonomy not loaded")
+              sys.exit(1)
+
+          print("OK: taxonomy loaded")
+          PY
       
       - name: Run unit tests
         run: python -m pytest -q -m "not requires_torch"
