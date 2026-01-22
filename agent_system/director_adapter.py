@@ -371,10 +371,8 @@ Focus on:
             override_signal_weight = 0.0
             if request.override_context and request.override_context.get("override_kind") == "noise":
                 override_signal_weight = 0.0
-            uncertainty = "high" if (request.override_context and request.override_context.get("present")) else "unknown"
-            if uncertainty == "high":
-                confidence = max(0.0, confidence - 0.15)
-            if result.get("uncertainty") == "high":
+            unc = (result.get("uncertainty") or request.uncertainty or "unknown")
+            if str(unc).lower() == "high":
                 confidence = min(confidence, 0.75)
             score = confidence * risk_multiplier
             append_decision_event({
@@ -389,7 +387,7 @@ Focus on:
                 "next_step": next_step,
                 "override_context": request.override_context,
                 "override_signal_weight": override_signal_weight,
-                "uncertainty": uncertainty,
+                "uncertainty": str(unc).lower(),
             })
             return DirectorResponse(
                 decision=result['decision'],
