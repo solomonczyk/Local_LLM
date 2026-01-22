@@ -200,7 +200,8 @@ Please provide your decision in this EXACT JSON format:
   "next_step": "One specific next action (max 100 chars)",
   "confidence": 0.85,
   "reasoning": "Brief explanation of decision logic",
-  "decision_class": "infra|security|product|process|unknown"
+  "decision_class": "infra|security|product|process|unknown",
+  "uncertainty": "low|medium|high|unknown"
 }}
 
 Focus on:
