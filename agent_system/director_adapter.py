@@ -373,7 +373,7 @@ Focus on:
             override_signal_weight = 0.0
             if request.override_context and request.override_context.get("override_kind") == "noise":
                 override_signal_weight = 0.0
-            unc = (result.get("uncertainty") or request.uncertainty or "unknown")
+            unc = result.get("uncertainty") or "unknown"
             if str(unc).lower() == "high":
                 confidence = min(confidence, 0.75)
             score = confidence * risk_multiplier
