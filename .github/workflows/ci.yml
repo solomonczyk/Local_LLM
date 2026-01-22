@@ -48,6 +48,10 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-cov
+
+      - name: Uncertainty taxonomy smoke (CI)
+        run: |
+          python tools/run_inference.py --smoke | grep "UNCERTAINTY_TAXONOMY_LOADED version=1.0"
       
       - name: Run unit tests
         run: python -m pytest -q -m "not requires_torch"
