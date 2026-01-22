@@ -1,0 +1,7 @@
+{
+  "experiment": "exp01",
+  "status": "accepted",
+  "decision": "keep_as_baseline",
+  "reason": "Improved safety on high-uncertainty cases without degrading low-risk behavior",
+  "next": "prepare exp02 with extended dataset"
+}

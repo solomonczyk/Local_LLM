@@ -1,0 +1,17 @@
+{
+  "experiment": "exp01",
+  "lora_path": "data/lora/exp01",
+  "ab_tests": [
+    {
+      "prompt": "CI uncertainty injection smoke test",
+      "base": {"confidence": 0.8, "score": 0.8, "uncertainty": "medium"},
+      "lora": {"confidence": 0.75, "score": 0.75, "uncertainty": "high"}
+    },
+    {
+      "prompt": "CI autolink smoke test",
+      "base": {"confidence": 0.9, "score": 0.9, "uncertainty": "low"},
+      "lora": {"confidence": 0.88, "score": 0.88, "uncertainty": "low"}
+    }
+  ],
+  "conclusion": "LoRA increases caution on high-uncertainty case, remains stable on low-risk case."
+}

@@ -153,6 +153,7 @@ jobs:
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
             data/decision_events.log
+            data/reports/decision_events.jsonl
           if-no-files-found: ignore
 
   security-check:
