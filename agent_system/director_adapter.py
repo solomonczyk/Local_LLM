@@ -316,6 +316,10 @@ Focus on:
                                 "decision_class": {
                                     "type": "string",
                                     "enum": ["infra", "security", "product", "process", "unknown"]
+                                },
+                                "uncertainty": {
+                                    "type": "string",
+                                    "enum": ["low", "medium", "high", "unknown"]
                                 }
                             },
                             "required": [
