@@ -1,0 +1,10 @@
+{
+  "log_path": "data\\reports\\decision-dashboard-21235918733\\decision_events.log",
+  "events_total": 5,
+  "override_events_total": 0,
+  "override_rate": 0.0,
+  "by_uncertainty": {},
+  "by_override_reason": {},
+  "by_override_kind": {},
+  "top_reason_x_uncertainty": []
+}

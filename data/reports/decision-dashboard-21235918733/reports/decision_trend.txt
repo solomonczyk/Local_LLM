@@ -1,0 +1,27 @@
+FILTER_DEBUG: log=data/decision_events.log since_ts=None since_minutes=None windows=1440 exclude=['legacy_unknown']
+AVG_DEBUG: raw_avg=0.870000 effective_avg=0.870000
+ADAPTIVE_GUARD: SKIP (insufficient_samples=1)
+ADAPTIVE_COOLDOWN: INIT (effective=0.60)
+ADAPTIVE_STABILITY: STABLE (effective=0.60 delta=+0.00)
+ADAPTIVE_STATUS: guard=SKIP samples=1 hrs=0.00 effective=0.60 cooldown=INIT stability=STABLE
+ADAPTIVE_IMPACT: none
+TREND: PASS (avg=0.870, threshold=0.6, grace=0.035) bad=0 ok=0 good=1
+POLICY_APPLIED_ALL: director_process_regressions_soften_v2=0 director_regressions_soften_v1=0
+POLICY_DELTA_CAPPED: applied=0 capped=0 max_delta=none
+ROLLBACK_OUTCOMES: simulated=0 approved=0 applied=0 skipped=0
+ROLLBACK_PRESSURE: OK (simulated=0)
+RETROFILL_APPLIED: 0
+RCA_BAD_BY_AGENT: director=0 architect=0 qa=0 security=0 dev=0 unknown=0
+RCA_BAD_BY_CLASS_DIRECTOR: process=0 infra=0 security=0 product=0 unknown=0
+RCA_BAD_PENALTY_DIRECTOR_PROCESS: regressions=0 coverage=0 insufficient=0 other=0 missing=0
+RCA_BAD_DEBUG: kept_total=1 bad_total=0 bad_agent_field_present=0
+SHADOW_POLICY_CANDIDATES: director_regressions_soften_v2=0
+SHADOW_POLICY_READY: director_regressions_soften_v2=false
+ROLLBACK_SUGGESTED: false
+ROLLBACK_FEEDBACK: none
+ROLLBACK_PLAN: none
+ROLLBACK_READINESS: PASS
+AUTO_PROMOTE_READY: director_regressions_soften_v2=false
+AUTO_PROMOTE_PLAN: none
+SHADOW_READY_STREAK: director_regressions_soften_v2=0/5
+SUMMARY_JSON_MULTI: {"windows": [{"trend_status": "PASS", "avg": 0.87, "threshold": 0.6, "grace": 0.035, "counts": {"bad": 0, "ok": 0, "good": 1, "total": 1}, "policy_mode": "OFF", "policy_applied": {"version": "director_regressions_soften_v1", "count": 0}, "policy_applied_counts": {"director_regressions_soften_v1": 0, "director_process_regressions_soften_v2": 0}, "policy_delta_capped": {"applied": 0, "capped": 0, "max_delta": null}, "since_minutes": 1440.0, "exclude_class": ["legacy_unknown"], "min_count": 5, "max_risk_level": "low", "shadow_policy_candidates": {"director_regressions_soften_v2": 0}, "rollback_outcomes": {"simulated": 0, "approved": 0, "applied": 0, "skipped": 0}, "rca_bad_debug": {"kept_total": 1, "bad_total": 0, "bad_agent_field_present": 0}, "rca_bad_by_agent": {}, "rca_bad_by_class_director": {}, "rca_bad_penalty_director_process": {}, "retrofill_applied": 0, "window_minutes": 1440, "adaptive_threshold_line": "ADAPTIVE_THRESHOLD: base=0.6 effective=0.6 high_risk_share=0.00 high_risk_count=0 total=1", "adaptive_status_line": "ADAPTIVE_STATUS: guard=SKIP samples=1 hrs=0.00 effective=0.60 cooldown=INIT stability=STABLE"}], "shadow": {"candidates": {"director_regressions_soften_v2": 0}, "ready": {"director_regressions_soften_v2": false}}, "shadow_history": {"director_regressions_soften_v2": {"candidates": 0, "ready": false, "window_minutes": 1440, "drift_status": null, "policy_dependency": null}}}

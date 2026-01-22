@@ -374,6 +374,8 @@ Focus on:
             uncertainty = "high" if (request.override_context and request.override_context.get("present")) else "unknown"
             if uncertainty == "high":
                 confidence = max(0.0, confidence - 0.15)
+            if result.get("uncertainty") == "high":
+                confidence = min(confidence, 0.75)
             score = confidence * risk_multiplier
             append_decision_event({
                 "type": "director_decision",
