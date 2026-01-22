@@ -134,6 +134,7 @@ jobs:
             data/reports/decision_trend.txt
             data/reports/rollback_plan.json
             data/reports/adaptive_threshold_state.json
+            data/decision_events.log
           if-no-files-found: ignore
 
   security-check:
