@@ -55,6 +55,24 @@ jobs:
           DIRECTOR_ACTIVE_MODE: "false"
           SHADOW_DIRECTOR_ENABLED: "false"
 
+      - name: Director uncertainty injection smoke (CI)
+        run: |
+          python - <<'PY'
+          from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
+
+          d = DirectorAdapter()
+          req = DirectorRequest(
+              problem_summary="CI uncertainty injection smoke test",
+              facts=["ci", "synthetic_uncertainty=high"],
+              agent_summaries={"dev": "force uncertainty high to test floor & penalty"},
+              risk_level=RiskLevel.LOW,
+              confidence=0.9,
+              uncertainty="high",
+          )
+          _ = d.call_director(req)
+          print("UNCERTAINTY_INJECTION_SMOKE: ok")
+          PY
+
       - name: Generate decision dashboard
         run: python tools/decision_dashboard.py --out data/reports/dashboard_daily.md --fail-below-score 0.6
 
