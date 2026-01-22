@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, Union, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 DECISION_LOG_PATH = Path("data/decision_events.log")
 METRICS_PATH = Path("data/metrics.json")

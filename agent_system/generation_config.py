@@ -4,7 +4,7 @@
 Основано на результатах eval: исправляем проблемы с отступами и обрывами
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class GenerationConfig:

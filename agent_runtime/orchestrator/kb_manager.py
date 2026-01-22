@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+
 class KnowledgeBaseManager:
     """
     Управление Knowledge Base для агентов консилиума.

@@ -3,7 +3,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 LOG_PATH = Path("data/decision_events.log")
 TMP_PATH = Path("data/decision_events.log.tmp")
 

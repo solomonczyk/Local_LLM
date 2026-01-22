@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from .audit import audit_logger
 from .database_tools import db_manager
 
+
 @dataclass
 class MemoryMessage:
     """Сообщение в памяти агента"""

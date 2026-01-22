@@ -4,18 +4,20 @@ Director Adapter - интерфейс для OpenAI Director
 Реализует гибридную архитектуру: локальные workers + облачный director
 """
 
-import os
 import json
-import time
+import os
 import re
-import sys
 import subprocess
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+import sys
+import time
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import openai
 from openai import OpenAI
+
 from agent_system.circuit_breaker import CircuitBreaker
 from agent_system.decision_log import append_decision_event
 

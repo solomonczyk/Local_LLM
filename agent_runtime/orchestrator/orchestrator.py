@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from .agent import Agent
 from .consilium import get_consilium
 
+
 class Orchestrator:
     """Оркестратор для управления агентами и выполнения задач"""
 

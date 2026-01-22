@@ -4,12 +4,12 @@ Daily Director Report Generator
 Читает логи и генерирует ежедневный отчёт в Markdown
 """
 
-import os
 import json
+import os
 import statistics
-from datetime import datetime, date
 from collections import defaultdict
-from typing import Dict, List, Any, Optional
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 
 
 def load_jsonl(filepath: str) -> List[Dict]:

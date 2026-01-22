@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from .audit import audit_logger
 from .config import AgentConfig, SecurityConfig
 
+
 class FileTools:
     """
     Безопасные инструменты для работы с файлами.

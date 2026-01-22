@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from agent_system.decision_log import append_decision_event
+
 LOG = Path("data/decision_events.log")
 POLICY_RULES_PATH = Path("tools/policy_rules.json")
 MIN_EVENTS = 5

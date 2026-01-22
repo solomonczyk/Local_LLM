@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from .conversation import conversation_manager
 
+
 class ProactiveAgent:
     """Агент с проактивным поведением"""
 

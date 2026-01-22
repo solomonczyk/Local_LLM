@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 from collections import Counter, defaultdict
+from pathlib import Path
 
 CANDIDATE_LOGS = [
     Path("data/decision_events.log"),

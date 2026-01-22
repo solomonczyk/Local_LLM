@@ -5,10 +5,10 @@ Shadow Director - тестирование Director в shadow mode
 """
 
 import json
-import time
 import os
-from typing import Dict, Any, List, Optional
+import time
 from dataclasses import asdict
+from typing import Any, Dict, List, Optional
 
 from .director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
 

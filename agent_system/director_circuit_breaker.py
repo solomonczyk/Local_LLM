@@ -3,13 +3,13 @@
 Director Circuit Breaker - авто-rollback по метрикам для защиты от деградации
 """
 
-import os
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+import os
 from collections import deque
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

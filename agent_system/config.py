@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import List, Set, Tuple
 
+
 class SecurityConfig:
     """Политики безопасности для tool execution"""
 

@@ -5,7 +5,6 @@ import sqlite3
 import sys
 from pathlib import Path
 
-
 DB_PATH = Path("data/decision_events.db")
 TOP_N = 5
 LOW_SCORE_LIMIT = 0.6

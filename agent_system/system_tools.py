@@ -7,6 +7,7 @@ from typing import Any, Dict
 from .audit import audit_logger
 from .config import AgentConfig, SecurityConfig
 
+
 class SystemTools:
     """Инструменты для системных операций"""
 
