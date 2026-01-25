@@ -15,6 +15,7 @@ FROZEN
 - Any format violation causes CI FAIL
 - No reliance on prompt persuasion
 - No model fine-tuning required
+- CI smoke does not require OPENAI_API_KEY (director smoke is key-tolerant via fallback_record_only)
 
 ## Locked Components
 - gateway/server.py (format gate)
