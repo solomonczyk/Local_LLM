@@ -71,7 +71,6 @@ jobs:
               agent_summaries={"dev": "force uncertainty high to test floor & penalty"},
               risk_level=RiskLevel.LOW,
               confidence=0.9,
-              uncertainty="high",
           )
           _ = d.call_director(req)
           print("UNCERTAINTY_INJECTION_SMOKE: ok")
