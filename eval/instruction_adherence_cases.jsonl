@@ -1,0 +1,12 @@
+{"id":"IA01","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about GPUs."}
+{"id":"IA02","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about Docker."}
+{"id":"IA03","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about APIs."}
+{"id":"IA04","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about databases."}
+{"id":"IA05","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about networking."}
+{"id":"IA06","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about latency."}
+{"id":"IA07","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about rate limits."}
+{"id":"IA08","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about rollbacks."}
+{"id":"IA09","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about logging."}
+{"id":"IA10","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about CI pipelines."}
+{"id":"IA11","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about backups."}
+{"id":"IA12","prompt":"Say OK and then output exactly 3 bullet lines that start with \"-\" about caching."}

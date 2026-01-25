@@ -58,6 +58,7 @@ audit_logs/
 
 # Director/Agent logs (Ð¼Ð¾Ð³ÑƒÑ‚ ÑÐ¾Ð´ÐµÑ€Ð¶Ð°Ñ‚ÑŒ Ñ‡ÑƒÐ²ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ðµ Ð´Ð°Ð½Ð½Ñ‹Ðµ)
 *.jsonl
+!eval/instruction_adherence_cases.jsonl
 task_run.jsonl
 active_director.jsonl
 shadow_director.jsonl
