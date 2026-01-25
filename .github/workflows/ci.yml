@@ -55,7 +55,7 @@ jobs:
           import subprocess, sys
 
           p = subprocess.run(
-              ["python", "tools/run_inference.py", "--smoke"],
+              ["python", "tools/run_inference_smoke.py", "--smoke"],
               capture_output=True,
               text=True
           )
