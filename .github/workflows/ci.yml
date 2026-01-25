@@ -51,7 +51,7 @@ jobs:
 
       - name: Uncertainty taxonomy smoke (CI)
         run: |
-          python tools/decision_trend.py --smoke
+          python tools/decision_trend.py --min-count 1 --grace 0.0
       
       - name: Run unit tests
         run: python -m pytest -q -m "not requires_torch"
