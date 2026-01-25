@@ -178,6 +178,43 @@ jobs:
             data/reports/decision_events.jsonl
           if-no-files-found: ignore
 
+  instruction-adherence-eval:
+    name: Instruction Adherence Eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install openai
+
+      - name: Run instruction adherence eval
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          IA_MODEL: gpt-5.2
+          IA_CASES_PATH: eval/instruction_adherence_cases.jsonl
+          IA_TIMEOUT_S: "60"
+          IA_MAX_OUTPUT_TOKENS: "80"
+          IA_TEMPERATURE: "0"
+        run: |
+          python tools/eval_instruction_adherence.py
+
+      - name: Upload instruction adherence report (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instruction-adherence-report-${{ github.run_id }}
+          path: |
+            data/reports/instruction_adherence_violations.json
+          if-no-files-found: ignore
+
   security-check:
     runs-on: ubuntu-latest
     steps:
