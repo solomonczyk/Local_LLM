@@ -60,6 +60,8 @@ jobs:
           SHADOW_DIRECTOR_ENABLED: "false"
 
       - name: Director uncertainty injection smoke (CI)
+        env:
+          DIRECTOR_MODE: record-only
         run: |
           python - <<'PY'
           from agent_system.director_adapter import DirectorAdapter, DirectorRequest, RiskLevel
