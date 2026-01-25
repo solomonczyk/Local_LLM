@@ -203,7 +203,6 @@ jobs:
           IA_TIMEOUT_S: "60"
           IA_MAX_OUTPUT_TOKENS: "80"
           IA_TEMPERATURE: "0"
-          IA_BREAK_ONE_CASE: "1"
         run: |
           python tools/eval_instruction_adherence.py
 
