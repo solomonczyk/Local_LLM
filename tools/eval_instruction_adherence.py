@@ -72,6 +72,9 @@ def _openai_call(prompt: str) -> str:
 
 def main() -> int:
     cases = _load_cases(CASES_PATH)
+    break_one = os.getenv("IA_BREAK_ONE_CASE", "0") == "1"
+    if break_one and cases:
+        cases[0]["prompt"] = "Output exactly 'OK.' on one line and nothing else."
     violations: List[Dict] = []
 
     total = len(cases)
