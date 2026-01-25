@@ -4,7 +4,7 @@ import sys
 import time
 from typing import Dict, List, Tuple
 
-DEFAULT_MODEL = os.getenv("IA_MODEL", "gpt-4o-mini")
+DEFAULT_MODEL = os.getenv("IA_MODEL", "gpt-5.2")
 CASES_PATH = os.getenv("IA_CASES_PATH", "eval/instruction_adherence_cases.jsonl")
 TIMEOUT_S = int(os.getenv("IA_TIMEOUT_S", "60"))
 MAX_OUTPUT_TOKENS = int(os.getenv("IA_MAX_OUTPUT_TOKENS", "80"))
